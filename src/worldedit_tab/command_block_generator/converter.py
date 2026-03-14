@@ -120,12 +120,16 @@ def convert_to_command_blocks(
 
 
 # ─────────────────────────────────────────────────────────────
-# WALL CONVERSION (placement unchanged, commands fixed)
+# WALL CONVERSION — FIXED PADDING (no more stone at 0,0,0)
+# ─────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────
+# WALL CONVERSION — STONE FILLER + CORRECT ABSOLUTE COORDINATES
 # ─────────────────────────────────────────────────────────────
 
 def convert_to_command_block_wall(
     data,
-    player_pos: tuple[float, float, float],  # unused (kept for GUI compatibility)
+    player_pos: tuple[float, float, float],
     wall_width: int,
     facing: str
 ) -> Compound:
@@ -135,28 +139,29 @@ def convert_to_command_block_wall(
     length = int(data['Length'])
     palette = data['Palette']
     block_data = data['BlockData']
+    offset = data.get('Offset', IntArray([0, 0, 0]))   # ← this was missing!
+
+    # Player position you entered in the GUI (the point you stood at when //copy)
+    px, py, pz = map(int, player_pos)
 
     inv_palette = {int(v): k for k, v in palette.items()}
 
-    # Collect original schematic blocks
-    blocks = []
+    # Collect ONLY real non-air blocks + their local schematic coords
+    real_blocks = []
     for hy in range(height):
         for hz in range(length):
             for hx in range(width):
-
                 idx = hy * (length * width) + hz * width + hx
                 state_id = int(block_data[idx])
                 block = inv_palette.get(state_id)
 
                 if block and block != AIR_BLOCK:
-                    blocks.append((hx, hy, hz, block))
+                    real_blocks.append((hx, hy, hz, block))
 
-    total = len(blocks)
-    wall_height = math.ceil(total / wall_width)
+    total_real = len(real_blocks)
+    wall_height = math.ceil(total_real / wall_width)
 
-    while len(blocks) < wall_width * wall_height:
-        blocks.append((0, 0, 0, "minecraft:stone"))
-
+    # New wall dimensions
     if facing in ("north", "south"):
         new_width = 1
         new_length = wall_width
@@ -165,20 +170,22 @@ def convert_to_command_block_wall(
         new_length = 1
 
     new_height = wall_height
+    total_slots = new_width * new_height * new_length
 
-    new_palette = Compound({})
+    # PALETTE: 0 = command block, 1 = minecraft:stone (filler)
     cb_state = command_block_state(facing)
-    new_palette[cb_state] = Int(0)
+    new_palette = Compound({
+        cb_state:           Int(0),
+        "minecraft:stone":  Int(1),
+    })
 
-    total_size = new_width * new_height * new_length
-    new_block_data = ByteArray([0] * total_size)
+    new_block_data = ByteArray([1] * total_slots)   # default = stone
     new_block_entities = List[Compound]()
 
-    # ─────────────────────────────────────────────────────────────
-    # COMMANDS NOW USE ORIGINAL SCHEMATIC COORDS (NO ~)
-    # ─────────────────────────────────────────────────────────────
-
-    for i, (ox, oy, oz, block) in enumerate(blocks):
+    # Place command blocks ONLY for real blocks, using ABSOLUTE world coords
+    for i, (local_x, local_y, local_z, block_type) in enumerate(real_blocks):
+        if i >= total_slots:
+            break
 
         col = i % wall_width
         row = i // wall_width
@@ -192,8 +199,17 @@ def convert_to_command_block_wall(
             wy = row
             wz = 0
 
-        # ORIGINAL schematic-local absolute coords
-        cmd = f"setblock {ox} {oy} {oz} {block}"
+        # === ABSOLUTE COORDINATE CALCULATION (THIS IS THE FIX) ===
+        abs_x = px + int(offset[0]) + local_x
+        abs_y = py + int(offset[1]) + local_y
+        abs_z = pz + int(offset[2]) + local_z
+
+        # Mark position as command block
+        flat_idx = wy * (new_length * new_width) + wz * new_width + wx
+        new_block_data[flat_idx] = 0
+
+        # Command now uses the REAL world position
+        cmd = f"setblock {abs_x} {abs_y} {abs_z} {block_type}"
 
         be = Compound({
             "id": String("minecraft:command_block"),
@@ -208,28 +224,19 @@ def convert_to_command_block_wall(
             "LastExecution": Long(0),
             "LastOutput": String("")
         })
-
         new_block_entities.append(be)
 
-    # ─────────────────────────────────────────────────────────────
-    # 1 BLOCK GAP OFFSET (UNCHANGED)
-    # ─────────────────────────────────────────────────────────────
-
+    # Offset for pasting the wall itself (1-block gap) — unchanged
     if facing == "east":
-        offset_x = 1
-        offset_z = 0
+        offset_x, offset_z = 1, 0
     elif facing == "west":
-        offset_x = -new_width
-        offset_z = 0
+        offset_x, offset_z = -new_width, 0
     elif facing == "south":
-        offset_x = 0
-        offset_z = 1
+        offset_x, offset_z = 0, 1
     elif facing == "north":
-        offset_x = 0
-        offset_z = -new_length
+        offset_x, offset_z = 0, -new_length
     else:
-        offset_x = 0
-        offset_z = 0
+        offset_x, offset_z = 0, 0
 
     new_data = Compound({
         "Version": data["Version"],
@@ -237,7 +244,7 @@ def convert_to_command_block_wall(
         "Width": Short(new_width),
         "Height": Short(new_height),
         "Length": Short(new_length),
-        "PaletteMax": Int(1),
+        "PaletteMax": Int(2),
         "Palette": new_palette,
         "BlockData": new_block_data,
         "BlockEntities": new_block_entities,
