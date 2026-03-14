@@ -2354,3 +2354,91 @@
 2026-02-28 16:15:40,166 - DEBUG - Removed widget Entry at row 15
 2026-02-28 16:15:40,394 - DEBUG - Canvas updated after UI change
 2026-02-28 16:15:40,396 - DEBUG - Always on top set to: True
+2026-02-28 21:41:43,735 - DEBUG - Logging initialized
+2026-02-28 21:41:43,831 - INFO - F12 keyboard hook initialized
+2026-02-28 21:41:43,866 - DEBUG - Stored config for widget Label at row 2: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 0, 'row': 2, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-02-28 21:41:43,867 - DEBUG - Stored config for widget Checkbutton at row 2: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 2, 'row': 2, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-02-28 21:41:43,867 - DEBUG - Stored config for widget Entry at row 2: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 1, 'row': 2, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-02-28 21:41:43,867 - DEBUG - Stored config for widget Label at row 8: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 0, 'row': 8, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 5, 'sticky': 'w'}
+2026-02-28 21:41:43,867 - DEBUG - Stored config for widget Checkbutton at row 8: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 2, 'row': 8, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 5, 'sticky': 'w'}
+2026-02-28 21:41:43,867 - DEBUG - Stored config for widget Label at row 9: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 0, 'row': 9, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-02-28 21:41:43,867 - DEBUG - Stored config for widget Entry at row 9: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 1, 'row': 9, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-02-28 21:41:43,867 - DEBUG - Stored config for widget Label at row 10: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 0, 'row': 10, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-02-28 21:41:43,867 - DEBUG - Stored config for widget Entry at row 10: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 1, 'row': 10, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-02-28 21:41:43,867 - DEBUG - Stored config for widget Label at row 11: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 0, 'row': 11, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-02-28 21:41:43,868 - DEBUG - Stored config for widget Entry at row 11: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 1, 'row': 11, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-02-28 21:41:43,868 - DEBUG - Stored config for widget Label at row 12: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 0, 'row': 12, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 5, 'sticky': 'w'}
+2026-02-28 21:41:43,868 - DEBUG - Stored config for widget Checkbutton at row 12: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 2, 'row': 12, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 5, 'sticky': 'w'}
+2026-02-28 21:41:43,868 - DEBUG - Stored config for widget Label at row 13: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 0, 'row': 13, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-02-28 21:41:43,868 - DEBUG - Stored config for widget Entry at row 13: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 1, 'row': 13, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-02-28 21:41:43,868 - DEBUG - Stored config for widget Label at row 14: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 0, 'row': 14, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-02-28 21:41:43,868 - DEBUG - Stored config for widget Entry at row 14: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 1, 'row': 14, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-02-28 21:41:43,868 - DEBUG - Stored config for widget Label at row 15: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 0, 'row': 15, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-02-28 21:41:43,868 - DEBUG - Stored config for widget Entry at row 15: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 1, 'row': 15, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-02-28 21:41:43,868 - DEBUG - Starting UI update: command_type=laser, is_laser=True
+2026-02-28 21:41:43,869 - DEBUG - Gridded widget Label at row 2
+2026-02-28 21:41:43,869 - DEBUG - Gridded widget Checkbutton at row 2
+2026-02-28 21:41:43,869 - DEBUG - Gridded widget Entry at row 2
+2026-02-28 21:41:43,869 - DEBUG - Gridded widget Label at row 8
+2026-02-28 21:41:43,869 - DEBUG - Gridded widget Checkbutton at row 8
+2026-02-28 21:41:43,869 - DEBUG - Gridded widget Label at row 9
+2026-02-28 21:41:43,869 - DEBUG - Gridded widget Entry at row 9
+2026-02-28 21:41:43,869 - DEBUG - Gridded widget Label at row 10
+2026-02-28 21:41:43,869 - DEBUG - Gridded widget Entry at row 10
+2026-02-28 21:41:43,869 - DEBUG - Gridded widget Label at row 11
+2026-02-28 21:41:43,869 - DEBUG - Gridded widget Entry at row 11
+2026-02-28 21:41:43,869 - DEBUG - Removed widget Label at row 12
+2026-02-28 21:41:43,869 - DEBUG - Removed widget Checkbutton at row 12
+2026-02-28 21:41:43,869 - DEBUG - Removed widget Label at row 13
+2026-02-28 21:41:43,870 - DEBUG - Removed widget Entry at row 13
+2026-02-28 21:41:43,870 - DEBUG - Removed widget Label at row 14
+2026-02-28 21:41:43,870 - DEBUG - Removed widget Entry at row 14
+2026-02-28 21:41:43,870 - DEBUG - Removed widget Label at row 15
+2026-02-28 21:41:43,870 - DEBUG - Removed widget Entry at row 15
+2026-02-28 21:41:43,969 - DEBUG - Canvas updated after UI change
+2026-02-28 21:41:43,970 - DEBUG - Always on top set to: True
+2026-02-28 21:41:51,048 - DEBUG - Always on top set to: False
+2026-03-14 11:05:32,641 - DEBUG - Logging initialized
+2026-03-14 11:05:32,701 - INFO - F12 keyboard hook initialized
+2026-03-14 11:05:32,746 - DEBUG - Stored config for widget Label at row 2: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 0, 'row': 2, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-03-14 11:05:32,747 - DEBUG - Stored config for widget Checkbutton at row 2: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 2, 'row': 2, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-03-14 11:05:32,747 - DEBUG - Stored config for widget Entry at row 2: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 1, 'row': 2, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-03-14 11:05:32,747 - DEBUG - Stored config for widget Label at row 8: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 0, 'row': 8, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 5, 'sticky': 'w'}
+2026-03-14 11:05:32,747 - DEBUG - Stored config for widget Checkbutton at row 8: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 2, 'row': 8, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 5, 'sticky': 'w'}
+2026-03-14 11:05:32,747 - DEBUG - Stored config for widget Label at row 9: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 0, 'row': 9, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-03-14 11:05:32,747 - DEBUG - Stored config for widget Entry at row 9: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 1, 'row': 9, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-03-14 11:05:32,747 - DEBUG - Stored config for widget Label at row 10: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 0, 'row': 10, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-03-14 11:05:32,747 - DEBUG - Stored config for widget Entry at row 10: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 1, 'row': 10, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-03-14 11:05:32,747 - DEBUG - Stored config for widget Label at row 11: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 0, 'row': 11, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-03-14 11:05:32,748 - DEBUG - Stored config for widget Entry at row 11: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 1, 'row': 11, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-03-14 11:05:32,748 - DEBUG - Stored config for widget Label at row 12: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 0, 'row': 12, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 5, 'sticky': 'w'}
+2026-03-14 11:05:32,748 - DEBUG - Stored config for widget Checkbutton at row 12: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 2, 'row': 12, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 5, 'sticky': 'w'}
+2026-03-14 11:05:32,748 - DEBUG - Stored config for widget Label at row 13: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 0, 'row': 13, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-03-14 11:05:32,748 - DEBUG - Stored config for widget Entry at row 13: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 1, 'row': 13, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-03-14 11:05:32,748 - DEBUG - Stored config for widget Label at row 14: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 0, 'row': 14, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-03-14 11:05:32,748 - DEBUG - Stored config for widget Entry at row 14: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 1, 'row': 14, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-03-14 11:05:32,748 - DEBUG - Stored config for widget Label at row 15: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 0, 'row': 15, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-03-14 11:05:32,748 - DEBUG - Stored config for widget Entry at row 15: {'in': <tkinter.ttk.Frame object .!notebook.!frame9.!canvas.!frame>, 'column': 1, 'row': 15, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-03-14 11:05:32,748 - DEBUG - Starting UI update: command_type=laser, is_laser=True
+2026-03-14 11:05:32,748 - DEBUG - Gridded widget Label at row 2
+2026-03-14 11:05:32,748 - DEBUG - Gridded widget Checkbutton at row 2
+2026-03-14 11:05:32,748 - DEBUG - Gridded widget Entry at row 2
+2026-03-14 11:05:32,748 - DEBUG - Gridded widget Label at row 8
+2026-03-14 11:05:32,748 - DEBUG - Gridded widget Checkbutton at row 8
+2026-03-14 11:05:32,750 - DEBUG - Gridded widget Label at row 9
+2026-03-14 11:05:32,750 - DEBUG - Gridded widget Entry at row 9
+2026-03-14 11:05:32,750 - DEBUG - Gridded widget Label at row 10
+2026-03-14 11:05:32,750 - DEBUG - Gridded widget Entry at row 10
+2026-03-14 11:05:32,750 - DEBUG - Gridded widget Label at row 11
+2026-03-14 11:05:32,750 - DEBUG - Gridded widget Entry at row 11
+2026-03-14 11:05:32,750 - DEBUG - Removed widget Label at row 12
+2026-03-14 11:05:32,750 - DEBUG - Removed widget Checkbutton at row 12
+2026-03-14 11:05:32,750 - DEBUG - Removed widget Label at row 13
+2026-03-14 11:05:32,750 - DEBUG - Removed widget Entry at row 13
+2026-03-14 11:05:32,750 - DEBUG - Removed widget Label at row 14
+2026-03-14 11:05:32,750 - DEBUG - Removed widget Entry at row 14
+2026-03-14 11:05:32,750 - DEBUG - Removed widget Label at row 15
+2026-03-14 11:05:32,750 - DEBUG - Removed widget Entry at row 15
+2026-03-14 11:05:32,878 - DEBUG - Canvas updated after UI change
+2026-03-14 11:05:32,880 - DEBUG - Always on top set to: True
+2026-03-14 11:05:43,915 - DEBUG - Always on top set to: False
