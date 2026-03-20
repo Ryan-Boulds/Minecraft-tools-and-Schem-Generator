@@ -1,16 +1,12 @@
 # worldedit_tab/worldedit_gui.py
-from .command_block_generator.gui import open_converter_window
+from .command_block_generator.gui import create_converter_subframe
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
 import threading
 
-# Existing imports
 from .schematic_generator import generate_schematic
 from .schem_viewer.viewer import SchematicViewer
-
-# New import for the converter window
-from .command_block_generator.gui import open_converter_window
 
 
 def create_worldedit_schematic_gui(frame, gui):
@@ -32,10 +28,16 @@ def create_worldedit_schematic_gui(frame, gui):
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(0, weight=1)
 
+    # Store reference to main content frame so we can hide/show it
+    main_content_frame = tk.Frame(scrollable_frame, bg='#f0f0f0')
+    main_content_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+    scrollable_frame.columnconfigure(0, weight=1)
+    scrollable_frame.rowconfigure(0, weight=1)
+
     # ───────────────────────────────────────────────
     #           Header row with button on the right
     # ───────────────────────────────────────────────
-    header_frame = tk.Frame(scrollable_frame, bg='#f0f0f0')
+    header_frame = tk.Frame(main_content_frame, bg='#f0f0f0')
     header_frame.grid(row=0, column=0, columnspan=5, sticky="ew", pady=(5, 10))
 
     tk.Label(
@@ -49,7 +51,7 @@ def create_worldedit_schematic_gui(frame, gui):
     tk.Button(
         header_frame,
         text="Schem → Command Blocks",
-        command=lambda: open_converter_window(gui.root),
+        command=lambda: show_converter_page(scrollable_frame, main_content_frame, gui),
         font=("Arial", 10, "bold"),
         bg='#FF5722',
         fg='#ffffff',
@@ -62,38 +64,38 @@ def create_worldedit_schematic_gui(frame, gui):
     # ───────────────────────────────────────────────
 
     # Block Type
-    tk.Label(scrollable_frame, text="Block Type:", font=("Arial", 10), bg='#f0f0f0').grid(row=1, column=0, pady=2, sticky="w")
-    tk.Entry(scrollable_frame, textvariable=gui.schematic_block, width=20, bg='#ffffff', font=("Arial", 10)).grid(row=1, column=1, pady=2, sticky="w")
+    tk.Label(main_content_frame, text="Block Type:", font=("Arial", 10), bg='#f0f0f0').grid(row=1, column=0, pady=2, sticky="w")
+    tk.Entry(main_content_frame, textvariable=gui.schematic_block, width=20, bg='#ffffff', font=("Arial", 10)).grid(row=1, column=1, pady=2, sticky="w")
 
     # Dimensions
-    tk.Label(scrollable_frame, text="Dimensions (Width, Height, Length):", font=("Arial", 12, "bold"), bg='#f0f0f0', fg='#333333').grid(row=2, column=0, columnspan=5, pady=(12, 2), sticky="w")
+    tk.Label(main_content_frame, text="Dimensions (Width, Height, Length):", font=("Arial", 12, "bold"), bg='#f0f0f0', fg='#333333').grid(row=2, column=0, columnspan=5, pady=(12, 2), sticky="w")
 
     for i, (label_text, var) in enumerate([
         ("Width:",  gui.schematic_width),
         ("Height:", gui.schematic_height),
         ("Length:", gui.schematic_length)
     ]):
-        tk.Label(scrollable_frame, text=label_text, font=("Arial", 10), bg='#f0f0f0').grid(row=i+3, column=0, pady=2, sticky="w")
-        tk.Entry(scrollable_frame, textvariable=var, width=10, bg='#ffffff', font=("Arial", 10)).grid(row=i+3, column=1, pady=2, sticky="w")
+        tk.Label(main_content_frame, text=label_text, font=("Arial", 10), bg='#f0f0f0').grid(row=i+3, column=0, pady=2, sticky="w")
+        tk.Entry(main_content_frame, textvariable=var, width=10, bg='#ffffff', font=("Arial", 10)).grid(row=i+3, column=1, pady=2, sticky="w")
 
     # Origin Coordinates
-    tk.Label(scrollable_frame, text="Origin (X, Y, Z):", font=("Arial", 12, "bold"), bg='#f0f0f0', fg='#333333').grid(row=6, column=0, columnspan=5, pady=(12, 2), sticky="w")
+    tk.Label(main_content_frame, text="Origin (X, Y, Z):", font=("Arial", 12, "bold"), bg='#f0f0f0', fg='#333333').grid(row=6, column=0, columnspan=5, pady=(12, 2), sticky="w")
 
     for i, (label_text, var) in enumerate([
         ("X:", gui.schematic_x),
         ("Y:", gui.schematic_y),
         ("Z:", gui.schematic_z)
     ]):
-        tk.Label(scrollable_frame, text=label_text, font=("Arial", 10), bg='#f0f0f0').grid(row=i+7, column=0, pady=2, sticky="w")
-        tk.Entry(scrollable_frame, textvariable=var, width=10, bg='#ffffff', font=("Arial", 10)).grid(row=i+7, column=1, pady=2, sticky="w")
+        tk.Label(main_content_frame, text=label_text, font=("Arial", 10), bg='#f0f0f0').grid(row=i+7, column=0, pady=2, sticky="w")
+        tk.Entry(main_content_frame, textvariable=var, width=10, bg='#ffffff', font=("Arial", 10)).grid(row=i+7, column=1, pady=2, sticky="w")
 
     # Command
-    tk.Label(scrollable_frame, text="Command:", font=("Arial", 12, "bold"), bg='#f0f0f0', fg='#333333').grid(row=10, column=0, columnspan=5, pady=(12, 2), sticky="w")
-    tk.Entry(scrollable_frame, textvariable=gui.schematic_command, width=40, bg='#ffffff', font=("Arial", 10)).grid(row=11, column=0, columnspan=3, pady=2, sticky="w")
+    tk.Label(main_content_frame, text="Command:", font=("Arial", 12, "bold"), bg='#f0f0f0', fg='#333333').grid(row=10, column=0, columnspan=5, pady=(12, 2), sticky="w")
+    tk.Entry(main_content_frame, textvariable=gui.schematic_command, width=40, bg='#ffffff', font=("Arial", 10)).grid(row=11, column=0, columnspan=3, pady=2, sticky="w")
 
     # Generate button
     tk.Button(
-        scrollable_frame,
+        main_content_frame,
         text="Generate and Save Schematic",
         command=lambda: generate_schematic(gui),
         font=("Arial", 11),
@@ -113,7 +115,7 @@ def create_worldedit_schematic_gui(frame, gui):
             gui.print_to_text(f"Viewing schematic: {file_path}", "normal")
 
     tk.Button(
-        scrollable_frame,
+        main_content_frame,
         text="View Schematic in 3D",
         command=open_viewer_window,
         font=("Arial", 11),
@@ -122,5 +124,18 @@ def create_worldedit_schematic_gui(frame, gui):
         activebackground='#1E88E5'
     ).grid(row=13, column=0, columnspan=5, pady=5, sticky="w")
 
-    # Extra spacing at bottom
-    tk.Label(scrollable_frame, text="", bg='#f0f0f0').grid(row=14, column=0, pady=20)
+    # Extra spacing
+    tk.Label(main_content_frame, text="", bg='#f0f0f0').grid(row=14, column=0, pady=20)
+
+
+def show_converter_page(scrollable_frame, main_content_frame, gui):
+    main_content_frame.grid_remove()
+    converter_frame = create_converter_subframe(scrollable_frame, gui, lambda: hide_converter_page(scrollable_frame, main_content_frame))
+    converter_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+
+
+def hide_converter_page(scrollable_frame, main_content_frame):
+    for child in scrollable_frame.winfo_children():
+        if child != main_content_frame:
+            child.destroy()
+    main_content_frame.grid()
