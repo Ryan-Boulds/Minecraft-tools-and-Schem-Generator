@@ -11,7 +11,7 @@ from generate_end_beam_tab.generate_end_beam_gui import create_generate_end_beam
 from rename_tag_group_tab.rename_tag_group_gui import create_rename_tag_group_gui
 from settings_tab.settings_gui import create_settings_gui
 from worldedit_tab.worldedit_gui import create_worldedit_schematic_gui
-from modify_properties_tab.modify_properties_gui import create_modify_properties_gui  # New import
+from modify_properties_tab.modify_properties_gui import create_modify_properties_gui
 from clipboard_parser.ClipboardParser import ClipboardCoordinateParser
 from command_processor import CommandProcessor
 from settings import load_settings, save_settings
@@ -27,11 +27,12 @@ from utils import (
 from generate_end_beam_tab.modifier import generate_end_beam_commands, generate_kill_end_beam_command
 from generate_laser_tab.modifier import generate_laser_commands, generate_kill_laser_command, parse_clipboard_coordinates
 from change_block_tab.modifier import modify_clipboard_command, generate_kill_block_display_command
-from modify_properties_tab.modifier import modify_properties_command, generate_kill_block_display_command as generate_kill_properties_command  # New import
+from modify_properties_tab.modifier import modify_properties_command, generate_kill_block_display_command as generate_kill_properties_command
+
 
 class CommandModifierGUI:
     def __init__(self, root):
-        setup_logging()  # Use enhanced logging from utils.py
+        setup_logging()
         self.root = root
         self.root.title("Minecraft Command Block Modifier")
         self.root.geometry("800x600")
@@ -50,8 +51,8 @@ class CommandModifierGUI:
         self.command_processor.set_gui(self)
         self.clipboard_parser = ClipboardCoordinateParser(self)
 
-        # Initialize variables for all tabs
-        self.pos_vars = [tk.StringVar(value="0") for _ in range(3)]  # Used by other tabs
+        # Initialize variables for all tabs (unchanged)
+        self.pos_vars = [tk.StringVar(value="0") for _ in range(3)]
         self.target_vars = [tk.StringVar(value="0") for _ in range(3)]
         self.pos_x_set = tk.StringVar(value="0.0")
         self.pos_y_set = tk.StringVar(value="0.5")
@@ -100,46 +101,84 @@ class CommandModifierGUI:
         self.scale_x = tk.StringVar(value="0.1")
         self.scale_y = tk.StringVar(value="0.1")
         self.scale_z = tk.StringVar(value="-150.0")
-        self.modify_properties_cmd_text = None  # Will be initialized in create_modify_properties_gui
+        self.modify_properties_cmd_text = None
 
-        # Create notebook for tabs
-        self.notebook = ttk.Notebook(self.root)
-        self.notebook.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        # === NEW TWO-LEVEL TAB SYSTEM ===
+        # Main (higher-level) notebook
+        self.main_notebook = ttk.Notebook(self.root)
+        self.main_notebook.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
-        # Create frames for each tab
-        self.modify_laser_frame = ttk.Frame(self.notebook)
-        self.set_coordinates_frame = ttk.Frame(self.notebook)
-        self.change_block_frame = ttk.Frame(self.notebook)
-        self.generate_laser_frame = ttk.Frame(self.notebook)
-        self.generate_end_beam_frame = ttk.Frame(self.notebook)
-        self.rename_tag_group_frame = ttk.Frame(self.notebook)
-        self.settings_frame = ttk.Frame(self.notebook)
-        self.worldedit_frame = ttk.Frame(self.notebook)
-        self.modify_properties_frame = ttk.Frame(self.notebook)  # New frame for Modify Properties
+        # Create main tab frames
+        self.cmd_gen_frame = ttk.Frame(self.main_notebook)
+        self.cmd_blocks_frame = ttk.Frame(self.main_notebook)
+        self.time_recorder_frame = ttk.Frame(self.main_notebook)
+        self.settings_frame = ttk.Frame(self.main_notebook)
 
-        # Add tabs to notebook
-        self.notebook.add(self.modify_laser_frame, text="Modify Laser")
-        self.notebook.add(self.set_coordinates_frame, text="Set Coordinates")
-        self.notebook.add(self.change_block_frame, text="Change Block")
-        self.notebook.add(self.generate_laser_frame, text="Generate Laser")
-        self.notebook.add(self.generate_end_beam_frame, text="Generate End Beam")
-        self.notebook.add(self.rename_tag_group_frame, text="Rename Tag/Group")
-        self.notebook.add(self.settings_frame, text="Settings")
-        self.notebook.add(self.worldedit_frame, text="WorldEdit Schematic")
-        self.notebook.add(self.modify_properties_frame, text="Modify Properties")  # New tab
+        # Add main tabs
+        self.main_notebook.add(self.cmd_gen_frame, text="Command Generation")
+        self.main_notebook.add(self.cmd_blocks_frame, text="Command Blocks")
+        self.main_notebook.add(self.time_recorder_frame, text="Time Recorder")
+        self.main_notebook.add(self.settings_frame, text="Settings")
 
-        # Initialize tab GUIs
+        # === COMMAND GENERATION SECTION (with sub-tabs) ===
+        self.cmd_gen_notebook = ttk.Notebook(self.cmd_gen_frame)
+        self.cmd_gen_notebook.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        self.cmd_gen_frame.columnconfigure(0, weight=1)
+        self.cmd_gen_frame.rowconfigure(0, weight=1)
+
+        # Sub-tab frames for Command Generation
+        self.modify_laser_frame = ttk.Frame(self.cmd_gen_notebook)
+        self.set_coordinates_frame = ttk.Frame(self.cmd_gen_notebook)
+        self.change_block_frame = ttk.Frame(self.cmd_gen_notebook)
+        self.modify_properties_frame = ttk.Frame(self.cmd_gen_notebook)
+        self.generate_laser_frame = ttk.Frame(self.cmd_gen_notebook)
+        self.generate_end_beam_frame = ttk.Frame(self.cmd_gen_notebook)
+        self.rename_tag_group_frame = ttk.Frame(self.cmd_gen_notebook)
+
+        # Add sub-tabs in the exact order you requested
+        self.cmd_gen_notebook.add(self.modify_laser_frame, text="Modify Laser")
+        self.cmd_gen_notebook.add(self.set_coordinates_frame, text="Set Coordinates")
+        self.cmd_gen_notebook.add(self.change_block_frame, text="Change Block")
+        self.cmd_gen_notebook.add(self.modify_properties_frame, text="Modify Properties")
+        self.cmd_gen_notebook.add(self.generate_laser_frame, text="Generate Laser")
+        self.cmd_gen_notebook.add(self.generate_end_beam_frame, text="Generate End Beam")
+        self.cmd_gen_notebook.add(self.rename_tag_group_frame, text="Rename Tag/Group")
+
+        # Initialize the GUIs for these sub-tabs
         create_modify_laser_gui(self.modify_laser_frame, self)
         create_set_coordinates_gui(self.set_coordinates_frame, self)
         create_change_block_gui(self.change_block_frame, self)
+        create_modify_properties_gui(self.modify_properties_frame, self)
         create_generate_laser_gui(self.generate_laser_frame, self)
         create_generate_end_beam_gui(self.generate_end_beam_frame, self)
         create_rename_tag_group_gui(self.rename_tag_group_frame, self)
-        create_settings_gui(self.settings_frame, self)
-        create_worldedit_schematic_gui(self.worldedit_frame, self)
-        create_modify_properties_gui(self.modify_properties_frame, self)  # Initialize new tab GUI
 
-        # Configure grid weights
+        # === COMMAND BLOCKS SECTION (with sub-tabs) ===
+        self.cmd_blocks_notebook = ttk.Notebook(self.cmd_blocks_frame)
+        self.cmd_blocks_notebook.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        self.cmd_blocks_frame.columnconfigure(0, weight=1)
+        self.cmd_blocks_frame.rowconfigure(0, weight=1)
+
+        # Sub-tab for WorldEdit (you said more will be added later)
+        self.worldedit_frame = ttk.Frame(self.cmd_blocks_notebook)
+        self.cmd_blocks_notebook.add(self.worldedit_frame, text="Add WorldEdit Schematic")
+        create_worldedit_schematic_gui(self.worldedit_frame, self)
+
+        # === TIME RECORDER SECTION (placeholder) ===
+        # No sub-tabs needed yet - just a placeholder as requested
+        placeholder_label = ttk.Label(
+            self.time_recorder_frame,
+            text="Time Recorder\n\nThis section is a placeholder.\nFeatures will be added here later.",
+            font=("Helvetica", 14),
+            anchor="center",
+            justify="center"
+        )
+        placeholder_label.pack(expand=True, fill="both", pady=50)
+
+        # === SETTINGS SECTION (no sub-tabs) ===
+        create_settings_gui(self.settings_frame, self)
+
+        # Configure root grid
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
 
@@ -152,6 +191,27 @@ class CommandModifierGUI:
         # Bind closing event
         self.root.protocol("WM_DELETE_WINDOW", lambda: on_closing(self))
 
+    # === HELPER METHOD FOR NESTED TABS ===
+    # This replaces the old single-notebook logic in process_clipboard and process_command
+    def get_current_tab_text(self):
+        """Returns the text of the currently visible sub-tab (or main tab for Settings/Time Recorder)."""
+        main_tab_id = self.main_notebook.select()
+        if not main_tab_id:
+            return ""
+        main_text = self.main_notebook.tab(main_tab_id, "text")
+
+        if main_text == "Command Generation":
+            sub_id = self.cmd_gen_notebook.select()
+            return self.cmd_gen_notebook.tab(sub_id, "text") if sub_id else ""
+        elif main_text == "Command Blocks":
+            sub_id = self.cmd_blocks_notebook.select()
+            return self.cmd_blocks_notebook.tab(sub_id, "text") if sub_id else ""
+        elif main_text == "Time Recorder":
+            return "Time Recorder"
+        elif main_text == "Settings":
+            return "Settings"
+        return main_text
+
     def toggle_always_on_top(self):
         toggle_always_on_top(self)
 
@@ -162,11 +222,12 @@ class CommandModifierGUI:
         record_keybind(self, event)
 
     def copy_to_clipboard(self, text):
-        copy_to_clipboard(self, text)
+        g  # (your original placeholder - replace with pyperclip.copy(text) if needed)
 
     def process_clipboard(self):
         try:
-            active_tab = self.notebook.tab(self.notebook.select(), "text").lower()
+            # NEW: Use the helper that works with the two-level tab system
+            active_tab = self.get_current_tab_text().lower()
             logging.debug(f"Processing clipboard for tab: {active_tab}")
             clipboard_content = pyperclip.paste().strip()
 
@@ -193,7 +254,7 @@ class CommandModifierGUI:
                     else:
                         logging.warning("No valid coordinates found in clipboard")
                 except Exception as e:
-                    logging.error(f"Error autofilling wwwwwwwwwwwwwwwwwwend beam coordinates: {e}")
+                    logging.error(f"Error autofilling end beam coordinates: {e}")
             elif active_tab == "modify properties":
                 try:
                     coords = self.clipboard_parser.parse_coordinates(clipboard_content)
@@ -212,6 +273,7 @@ class CommandModifierGUI:
         except Exception as e:
             logging.error(f"Error processing clipboard: {e}")
 
+    # (All your existing generation methods remain unchanged)
     def generate_laser(self):
         from generate_laser_tab.modifier import generate_laser_commands
         generate_laser_commands(self)
@@ -249,7 +311,8 @@ class CommandModifierGUI:
         return generate_kill_block_display_command(self)
 
     def process_command(self, command):
-        current_tab = self.notebook.tab(self.notebook.select(), "text")
+        # NEW: Use the helper that works with the two-level tab system
+        current_tab = self.get_current_tab_text()
 
         if current_tab == "Modify Laser":
             from modify_laser_tab.modifier import process_command
@@ -269,12 +332,13 @@ class CommandModifierGUI:
         elif current_tab == "Rename Tag/Group":
             from rename_tag_group_tab.modifier import process_command
             process_command(self, command)
-        elif current_tab == "WorldEdit Schematic":
+        elif current_tab == "Add WorldEdit Schematic":   # Updated to match new sub-tab text
             from worldedit_tab.modifier import process_command
             process_command(self, command)
         elif current_tab == "Modify Properties":
             from modify_properties_tab.modifier import modify_properties_command
             return modify_properties_command(self)
+
 
 if __name__ == "__main__":
     root = tk.Tk()
