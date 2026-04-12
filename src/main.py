@@ -1,8 +1,12 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox, filedialog
 import logging
 import pyperclip
+import time
+import json
+import keyboard
 
+# Existing imports
 from modify_laser_tab.modify_laser_gui import create_modify_laser_gui
 from set_coordinates_tab.set_coordinates_gui import create_set_coordinates_gui
 from change_block_tab.change_block_gui import create_change_block_gui
@@ -12,6 +16,12 @@ from rename_tag_group_tab.rename_tag_group_gui import create_rename_tag_group_gu
 from settings_tab.settings_gui import create_settings_gui
 from worldedit_tab.worldedit_gui import create_worldedit_schematic_gui
 from modify_properties_tab.modify_properties_gui import create_modify_properties_gui
+
+# Time Recorder imports
+from time_recorder.map_buttons_tab.map_buttons_gui import create_map_buttons_gui
+from time_recorder.timeline_tab.timeline_gui import create_timeline_gui
+from time_recorder.builder_setup_tab.builder_setup_gui import create_builder_setup_gui
+
 from clipboard_parser.ClipboardParser import ClipboardCoordinateParser
 from command_processor import CommandProcessor
 from settings import load_settings, save_settings
@@ -20,15 +30,8 @@ from utils import (
     toggle_always_on_top,
     start_record_keybind,
     record_keybind,
-    process_clipboard,
     on_closing,
-    copy_to_clipboard
 )
-from generate_end_beam_tab.modifier import generate_end_beam_commands, generate_kill_end_beam_command
-from generate_laser_tab.modifier import generate_laser_commands, generate_kill_laser_command, parse_clipboard_coordinates
-from change_block_tab.modifier import modify_clipboard_command, generate_kill_block_display_command
-from modify_properties_tab.modifier import modify_properties_command, generate_kill_block_display_command as generate_kill_properties_command
-
 
 class CommandModifierGUI:
     def __init__(self, root):
@@ -38,7 +41,7 @@ class CommandModifierGUI:
         self.root.geometry("800x600")
         self.root.configure(bg='#f0f0f0')
 
-        # Initialize settings and variables
+        # Settings & core variables
         self.settings = load_settings()
         self.always_on_top = tk.BooleanVar(value=self.settings.get("always_on_top", True))
         self.key_bind = tk.StringVar(value=self.settings.get("key_bind", ""))
@@ -46,12 +49,11 @@ class CommandModifierGUI:
         self.is_recording_key = False
         self.is_destroyed = False
 
-        # Initialize command processor and clipboard parser
         self.command_processor = CommandProcessor()
         self.command_processor.set_gui(self)
         self.clipboard_parser = ClipboardCoordinateParser(self)
 
-        # Initialize variables for all tabs (unchanged)
+        # === ALL YOUR EXISTING VARIABLES ===
         self.pos_vars = [tk.StringVar(value="0") for _ in range(3)]
         self.target_vars = [tk.StringVar(value="0") for _ in range(3)]
         self.pos_x_set = tk.StringVar(value="0.0")
@@ -93,7 +95,6 @@ class CommandModifierGUI:
         self.schematic_y = tk.StringVar(value="0")
         self.schematic_z = tk.StringVar(value="0")
         self.schematic_command = tk.StringVar(value="say Hello from command block")
-        # New variables for Modify Properties tab
         self.command_type = tk.StringVar(value="laser")
         self.modify_block = tk.BooleanVar(value=True)
         self.modify_tag = tk.BooleanVar(value=True)
@@ -103,30 +104,36 @@ class CommandModifierGUI:
         self.scale_z = tk.StringVar(value="-150.0")
         self.modify_properties_cmd_text = None
 
-        # === NEW TWO-LEVEL TAB SYSTEM ===
-        # Main (higher-level) notebook
+        # === TIME RECORDER SHARED VARIABLES ===
+        self.mapped_commands = []
+        self.recording_sequence = []
+        self.is_recording = False
+        self.recording_start_time = None
+        self.current_mapping_index = None
+        self._mapping_popup = None
+        self.tick_rate = tk.StringVar(value="20")
+        self._held_keys = set()          # Prevents repeat triggers while key is held
+
+        # === MAIN NOTEBOOK ===
         self.main_notebook = ttk.Notebook(self.root)
         self.main_notebook.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
-        # Create main tab frames
         self.cmd_gen_frame = ttk.Frame(self.main_notebook)
         self.cmd_blocks_frame = ttk.Frame(self.main_notebook)
         self.time_recorder_frame = ttk.Frame(self.main_notebook)
         self.settings_frame = ttk.Frame(self.main_notebook)
 
-        # Add main tabs
         self.main_notebook.add(self.cmd_gen_frame, text="Command Generation")
         self.main_notebook.add(self.cmd_blocks_frame, text="Command Blocks")
         self.main_notebook.add(self.time_recorder_frame, text="Time Recorder")
         self.main_notebook.add(self.settings_frame, text="Settings")
 
-        # === COMMAND GENERATION SECTION (with sub-tabs) ===
+        # Command Generation sub-tabs
         self.cmd_gen_notebook = ttk.Notebook(self.cmd_gen_frame)
         self.cmd_gen_notebook.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         self.cmd_gen_frame.columnconfigure(0, weight=1)
         self.cmd_gen_frame.rowconfigure(0, weight=1)
 
-        # Sub-tab frames for Command Generation
         self.modify_laser_frame = ttk.Frame(self.cmd_gen_notebook)
         self.set_coordinates_frame = ttk.Frame(self.cmd_gen_notebook)
         self.change_block_frame = ttk.Frame(self.cmd_gen_notebook)
@@ -135,7 +142,6 @@ class CommandModifierGUI:
         self.generate_end_beam_frame = ttk.Frame(self.cmd_gen_notebook)
         self.rename_tag_group_frame = ttk.Frame(self.cmd_gen_notebook)
 
-        # Add sub-tabs in the exact order you requested
         self.cmd_gen_notebook.add(self.modify_laser_frame, text="Modify Laser")
         self.cmd_gen_notebook.add(self.set_coordinates_frame, text="Set Coordinates")
         self.cmd_gen_notebook.add(self.change_block_frame, text="Change Block")
@@ -144,7 +150,6 @@ class CommandModifierGUI:
         self.cmd_gen_notebook.add(self.generate_end_beam_frame, text="Generate End Beam")
         self.cmd_gen_notebook.add(self.rename_tag_group_frame, text="Rename Tag/Group")
 
-        # Initialize the GUIs for these sub-tabs
         create_modify_laser_gui(self.modify_laser_frame, self)
         create_set_coordinates_gui(self.set_coordinates_frame, self)
         create_change_block_gui(self.change_block_frame, self)
@@ -153,48 +158,141 @@ class CommandModifierGUI:
         create_generate_end_beam_gui(self.generate_end_beam_frame, self)
         create_rename_tag_group_gui(self.rename_tag_group_frame, self)
 
-        # === COMMAND BLOCKS SECTION (with sub-tabs) ===
+        # Command Blocks
         self.cmd_blocks_notebook = ttk.Notebook(self.cmd_blocks_frame)
         self.cmd_blocks_notebook.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
         self.cmd_blocks_frame.columnconfigure(0, weight=1)
         self.cmd_blocks_frame.rowconfigure(0, weight=1)
 
-        # Sub-tab for WorldEdit (you said more will be added later)
         self.worldedit_frame = ttk.Frame(self.cmd_blocks_notebook)
         self.cmd_blocks_notebook.add(self.worldedit_frame, text="Add WorldEdit Schematic")
         create_worldedit_schematic_gui(self.worldedit_frame, self)
 
-        # === TIME RECORDER SECTION (placeholder) ===
-        # No sub-tabs needed yet - just a placeholder as requested
-        placeholder_label = ttk.Label(
-            self.time_recorder_frame,
-            text="Time Recorder\n\nThis section is a placeholder.\nFeatures will be added here later.",
-            font=("Helvetica", 14),
-            anchor="center",
-            justify="center"
-        )
-        placeholder_label.pack(expand=True, fill="both", pady=50)
+        # Time Recorder sub-tabs
+        self.time_recorder_notebook = ttk.Notebook(self.time_recorder_frame)
+        self.time_recorder_notebook.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        self.time_recorder_frame.columnconfigure(0, weight=1)
+        self.time_recorder_frame.rowconfigure(0, weight=1)
 
-        # === SETTINGS SECTION (no sub-tabs) ===
+        self.map_buttons_frame = ttk.Frame(self.time_recorder_notebook)
+        self.timeline_frame = ttk.Frame(self.time_recorder_notebook)
+        self.builder_setup_frame = ttk.Frame(self.time_recorder_notebook)
+
+        self.time_recorder_notebook.add(self.map_buttons_frame, text="Map Buttons")
+        self.time_recorder_notebook.add(self.timeline_frame, text="Timeline")
+        self.time_recorder_notebook.add(self.builder_setup_frame, text="Builder Setup")
+
+        create_map_buttons_gui(self.map_buttons_frame, self)
+        create_timeline_gui(self.timeline_frame, self)
+        create_builder_setup_gui(self.builder_setup_frame, self)
+
         create_settings_gui(self.settings_frame, self)
 
-        # Configure root grid
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
 
-        # Apply initial settings
         if self.always_on_top.get():
             self.toggle_always_on_top()
         if self.key_bind.get():
             self.root.bind(self.key_bind.get(), lambda e: self.process_clipboard())
 
-        # Bind closing event
         self.root.protocol("WM_DELETE_WINDOW", lambda: on_closing(self))
 
-    # === HELPER METHOD FOR NESTED TABS ===
-    # This replaces the old single-notebook logic in process_clipboard and process_command
+        # Global keyboard listener
+        self._setup_key_listener()
+
+    # ====================== TIME RECORDER HELPERS ======================
+    def _setup_key_listener(self):
+        keyboard.hook(self._on_global_key_press)
+
+    def _on_global_key_press(self, event):
+        if event.event_type not in ("down", "up"):
+            return
+
+        key_name = event.name
+
+        # 1. Mapping mode
+        if self.current_mapping_index is not None:
+            if key_name not in {"esc", "unknown"}:
+                mapping = self.mapped_commands[self.current_mapping_index]
+                mapping["key"] = key_name
+                mapping["type"] = mapping.get("type", "single")
+                self.current_mapping_index = None
+                self.root.after(0, getattr(self, '_refresh_map_buttons', lambda: None))
+
+                if self._mapping_popup:
+                    try:
+                        self._mapping_popup.destroy()
+                    except:
+                        pass
+                    self._mapping_popup = None
+            return
+
+        # 2. Recording mode - Fast & no repeat on hold
+        if not (self.is_recording and self.recording_start_time is not None):
+            return
+
+        for mapping in self.mapped_commands:
+            if mapping.get("key") != key_name:
+                continue
+
+            cmd = None
+            timestamp = time.time() - self.recording_start_time
+
+            if mapping.get("type") == "hold":
+                if event.event_type == "down":
+                    if key_name not in self._held_keys:
+                        self._held_keys.add(key_name)
+                        cmd = mapping.get("down_command")
+                elif event.event_type == "up":
+                    if key_name in self._held_keys:
+                        self._held_keys.discard(key_name)
+                        cmd = mapping.get("up_command")
+            else:  # SINGLE COMMAND - only once per press
+                if event.event_type == "down":
+                    if key_name not in self._held_keys:
+                        self._held_keys.add(key_name)
+                        cmd = mapping.get("command")
+                elif event.event_type == "up":
+                    self._held_keys.discard(key_name)   # allow next press
+
+            if cmd:
+                self._trigger_mapped_command(cmd)
+                self.recording_sequence.append((cmd, timestamp))
+                break
+
+    def _trigger_mapped_command(self, command: str):
+        """Fast command simulation - no unnecessary delays"""
+        if not command:
+            return
+        pyperclip.copy(command.strip())
+        try:
+            keyboard.press_and_release("/")
+            keyboard.press_and_release("ctrl+v")
+            keyboard.press_and_release("enter")
+        except Exception as e:
+            logging.error(f"Simulation error: {e}")
+
+    def _show_listening_popup(self, index):
+        try:
+            if self._mapping_popup:
+                self._mapping_popup.destroy()
+        except:
+            pass
+
+        popup = tk.Toplevel(self.root)
+        popup.title("Mapping Key")
+        popup.geometry("300x120")
+        popup.resizable(False, False)
+        popup.grab_set()
+
+        ttk.Label(popup, text="Listening for key press...", font=("Helvetica", 11)).pack(pady=20)
+        ttk.Label(popup, text="Press any key (ESC to cancel)", foreground="gray").pack()
+
+        self._mapping_popup = popup
+
+    # ====================== TAB DETECTION ======================
     def get_current_tab_text(self):
-        """Returns the text of the currently visible sub-tab (or main tab for Settings/Time Recorder)."""
         main_tab_id = self.main_notebook.select()
         if not main_tab_id:
             return ""
@@ -207,11 +305,13 @@ class CommandModifierGUI:
             sub_id = self.cmd_blocks_notebook.select()
             return self.cmd_blocks_notebook.tab(sub_id, "text") if sub_id else ""
         elif main_text == "Time Recorder":
-            return "Time Recorder"
+            sub_id = self.time_recorder_notebook.select()
+            return self.time_recorder_notebook.tab(sub_id, "text") if sub_id else "Time Recorder"
         elif main_text == "Settings":
             return "Settings"
         return main_text
 
+    # ====================== OTHER METHODS ======================
     def toggle_always_on_top(self):
         toggle_always_on_top(self)
 
@@ -222,11 +322,10 @@ class CommandModifierGUI:
         record_keybind(self, event)
 
     def copy_to_clipboard(self, text):
-        g  # (your original placeholder - replace with pyperclip.copy(text) if needed)
+        pass
 
     def process_clipboard(self):
         try:
-            # NEW: Use the helper that works with the two-level tab system
             active_tab = self.get_current_tab_text().lower()
             logging.debug(f"Processing clipboard for tab: {active_tab}")
             clipboard_content = pyperclip.paste().strip()
@@ -238,9 +337,6 @@ class CommandModifierGUI:
                         self.laser_x.set(str(float(coords[0])))
                         self.laser_y.set(str(float(coords[1])))
                         self.laser_z.set(str(float(coords[2])))
-                        logging.debug(f"Autofilled laser coordinates: {coords}")
-                    else:
-                        logging.warning("No valid coordinates found in clipboard")
                 except Exception as e:
                     logging.error(f"Error autofilling laser coordinates: {e}")
             elif active_tab == "generate end beam":
@@ -250,9 +346,6 @@ class CommandModifierGUI:
                         self.end_beam_x.set(str(float(coords[0])))
                         self.end_beam_y.set(str(float(coords[1])))
                         self.end_beam_z.set(str(float(coords[2])))
-                        logging.debug(f"Autofilled end beam coordinates: {coords}")
-                    else:
-                        logging.warning("No valid coordinates found in clipboard")
                 except Exception as e:
                     logging.error(f"Error autofilling end beam coordinates: {e}")
             elif active_tab == "modify properties":
@@ -262,18 +355,13 @@ class CommandModifierGUI:
                         self.laser_x.set(str(float(coords[0])))
                         self.laser_y.set(str(float(coords[1])))
                         self.laser_z.set(str(float(coords[2])))
-                        logging.debug(f"Autofilled modify properties coordinates: {coords}")
-                    else:
-                        logging.warning("No valid coordinates found in clipboard")
                 except Exception as e:
                     logging.error(f"Error autofilling modify properties coordinates: {e}")
             else:
                 self.process_command(clipboard_content)
-
         except Exception as e:
             logging.error(f"Error processing clipboard: {e}")
 
-    # (All your existing generation methods remain unchanged)
     def generate_laser(self):
         from generate_laser_tab.modifier import generate_laser_commands
         generate_laser_commands(self)
@@ -311,9 +399,7 @@ class CommandModifierGUI:
         return generate_kill_block_display_command(self)
 
     def process_command(self, command):
-        # NEW: Use the helper that works with the two-level tab system
         current_tab = self.get_current_tab_text()
-
         if current_tab == "Modify Laser":
             from modify_laser_tab.modifier import process_command
             process_command(self, command)
@@ -332,7 +418,7 @@ class CommandModifierGUI:
         elif current_tab == "Rename Tag/Group":
             from rename_tag_group_tab.modifier import process_command
             process_command(self, command)
-        elif current_tab == "Add WorldEdit Schematic":   # Updated to match new sub-tab text
+        elif current_tab == "Add WorldEdit Schematic":
             from worldedit_tab.modifier import process_command
             process_command(self, command)
         elif current_tab == "Modify Properties":

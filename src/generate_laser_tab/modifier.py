@@ -12,7 +12,7 @@ def generate_laser_commands(gui):
         tag = gui.laser_tag.get() or "beam1"
         direction = gui.laser_direction.get() if hasattr(gui, 'laser_direction') else "North"
 
-        # Direction-specific offsets and transformations (with f suffixes)
+        # Direction-specific offsets and transformations
         if direction == "North":
             x, y, z = base_x - 0.08, base_y + 0.42, base_z - 0.01
             translation = "[0.5f,0.0f,0f]"
@@ -34,7 +34,6 @@ def generate_laser_commands(gui):
             translation = "[0.5f,0.0f,0f]"
             scale = "[0.1f,0.1f,-150f]"
 
-        # Helper to remove .00 if not needed
         def clean(num):
             if abs(num - int(num)) < 1e-6:
                 return str(int(num))
@@ -55,65 +54,59 @@ def generate_laser_commands(gui):
             gui.laser_cmd_text.insert("1.0", command)
 
         pyperclip.copy(command)
-        logging.debug(f"Generated Laser Command ({direction}): {command}")
         return command
-
     except ValueError as e:
         logging.error(f"Error generating laser command: {e}")
-        if hasattr(gui, 'laser_cmd_text') and gui.laser_cmd_text.winfo_exists():
-            gui.laser_cmd_text.delete("1.0", tk.END)
-            gui.laser_cmd_text.insert("1.0", "Error: Please enter valid numbers for coordinates.")
         return ""
-
-
-
 
 def generate_kill_laser_command(gui):
     try:
         tag = gui.laser_tag.get() or "beam1"
         command = f"/kill @e[tag={tag}]"
+        if hasattr(gui, 'laser_cmd_text') and gui.laser_cmd_text.winfo_exists():
+            gui.laser_cmd_text.delete("1.0", tk.END)
+            gui.laser_cmd_text.insert("1.0", command)
+        pyperclip.copy(command)
+        return command
+    except Exception as e:
+        logging.error(f"Error: {e}")
+        return ""
+
+def generate_rotate_command(gui, direction):
+    try:
+        tag = gui.laser_tag.get() or "beam1"
+        # Map directions to relative rotation values
+        # tp @s ~ ~ ~ [yaw] [pitch]
+        rot_map = {
+            "left": "~1 ~",
+            "right": "~-1 ~",
+            "up": "~ ~-1",
+            "down": "~ ~1"
+        }
+        rot_val = rot_map.get(direction, "~ ~")
+        command = f"execute as @e[tag={tag}] at @s run tp @s ~ ~ ~ {rot_val}"
 
         if hasattr(gui, 'laser_cmd_text') and gui.laser_cmd_text.winfo_exists():
             gui.laser_cmd_text.delete("1.0", tk.END)
             gui.laser_cmd_text.insert("1.0", command)
-        else:
-            logging.warning("laser_cmd_text not found or not initialized")
 
-        pyperclip.copy(command.encode('utf-8').decode('utf-8'))
-        logging.debug("Kill command copied to clipboard.")
-        logging.debug(f"Generated Kill Command: {command}")
+        pyperclip.copy(command)
         return command
     except Exception as e:
-        logging.error(f"Error generating kill command: {e}")
-        if hasattr(gui, 'laser_cmd_text') and gui.laser_cmd_text.winfo_exists():
-            gui.laser_cmd_text.delete("1.0", tk.END)
-            gui.laser_cmd_text.insert("1.0", "Error: Failed to generate kill command.")
+        logging.error(f"Error generating rotation: {e}")
         return ""
 
 def parse_clipboard_coordinates(gui):
     try:
         clipboard_content = pyperclip.paste().strip()
-        # Match coordinates in the format "X Y Z" (e.g., "0 0 0" or "-2 101 4")
         match = re.match(r'^(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)$', clipboard_content)
         if match:
             x, y, z = map(float, match.groups())
             gui.laser_x.set(str(x))
             gui.laser_y.set(str(y))
             gui.laser_z.set(str(z))
-            logging.debug(f"Autofilled coordinates from clipboard: {x}, {y}, {z}")
-            if hasattr(gui, 'laser_cmd_text') and gui.laser_cmd_text.winfo_exists():
-                gui.laser_cmd_text.delete("1.0", tk.END)
-                gui.laser_cmd_text.insert("1.0", f"Coordinates loaded: {x}, {y}, {z}")
-        else:
-            logging.warning("Invalid clipboard format for coordinates")
-            if hasattr(gui, 'laser_cmd_text') and gui.laser_cmd_text.winfo_exists():
-                gui.laser_cmd_text.delete("1.0", tk.END)
-                gui.laser_cmd_text.insert("1.0", "Error: Invalid clipboard format. Use 'X Y Z' (e.g., '0 0 0').")
     except Exception as e:
-        logging.error(f"Error parsing clipboard coordinates: {e}")
-        if hasattr(gui, 'laser_cmd_text') and gui.laser_cmd_text.winfo_exists():
-            gui.laser_cmd_text.delete("1.0", tk.END)
-            gui.laser_cmd_text.insert("1.0", "Error: Failed to parse clipboard coordinates.")
+        logging.error(f"Error: {e}")
 
 def process_command(gui, command):
     return generate_laser_commands(gui)
