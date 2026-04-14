@@ -1,11 +1,20 @@
+# ==================== time_recorder/map_buttons_tab/map_buttons_gui.py ====================
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk
 
 def create_map_buttons_gui(parent, app):
     frame = ttk.Frame(parent)
     frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-    ttk.Label(frame, text="Mapped Commands", font=("Helvetica", 12, "bold")).pack(anchor="w", pady=(0, 10))
+    # === TOP TOOLBAR (Save / Load on EVERY tab) ===
+    toolbar = ttk.Frame(frame)
+    toolbar.pack(fill="x", pady=(0, 10))
+
+    ttk.Button(toolbar, text="💾 Save Project", command=app.save_project).pack(side="left", padx=5)
+    ttk.Button(toolbar, text="📂 Load Project", command=app.load_project).pack(side="left", padx=5)
+
+    # --- Rest of the original Map Buttons GUI ---
+    ttk.Label(toolbar, text="Mapped Commands", font=("Helvetica", 12, "bold")).pack(side="left", padx=20)
 
     rows_frame = ttk.Frame(frame)
     rows_frame.pack(fill="both", expand=True)
@@ -22,69 +31,44 @@ def create_map_buttons_gui(parent, app):
             ttk.Label(row, text=f"#{i+1} [{mtype.upper()}]:").pack(side="left")
 
             if mtype == "hold":
-                ttk.Label(row, text="Down:").pack(side="left", padx=(10, 2))
-                down_entry = ttk.Entry(row, width=35)
-                down_entry.insert(0, mapping.get("down_command", ""))
-                down_entry.bind("<KeyRelease>", lambda e, idx=i: _update_down(idx, down_entry.get()))
-                down_entry.pack(side="left", padx=2, fill="x", expand=True)
+                ttk.Label(row, text="DN:").pack(side="left", padx=(10, 2))
+                dn_ent = ttk.Entry(row, width=30)
+                dn_ent.insert(0, mapping.get("down_command", ""))
+                dn_ent.bind("<KeyRelease>", lambda e, idx=i, ent=dn_ent: _update_data(idx, "down_command", ent.get()))
+                dn_ent.pack(side="left", fill="x", expand=True)
 
-                ttk.Label(row, text="Up:").pack(side="left", padx=(10, 2))
-                up_entry = ttk.Entry(row, width=35)
-                up_entry.insert(0, mapping.get("up_command", ""))
-                up_entry.bind("<KeyRelease>", lambda e, idx=i: _update_up(idx, up_entry.get()))
-                up_entry.pack(side="left", padx=2, fill="x", expand=True)
+                ttk.Label(row, text="UP:").pack(side="left", padx=(10, 2))
+                up_ent = ttk.Entry(row, width=30)
+                up_ent.insert(0, mapping.get("up_command", ""))
+                up_ent.bind("<KeyRelease>", lambda e, idx=i, ent=up_ent: _update_data(idx, "up_command", ent.get()))
+                up_ent.pack(side="left", fill="x", expand=True)
             else:
-                cmd_entry = ttk.Entry(row, width=50)
-                cmd_entry.insert(0, mapping.get("command", ""))
-                cmd_entry.bind("<KeyRelease>", lambda e, idx=i: _update_command(idx, cmd_entry.get()))
-                cmd_entry.pack(side="left", padx=5, fill="x", expand=True)
+                cmd_ent = ttk.Entry(row, width=50)
+                cmd_ent.insert(0, mapping.get("command", ""))
+                cmd_ent.bind("<KeyRelease>", lambda e, idx=i, ent=cmd_ent: _update_data(idx, "command", ent.get()))
+                cmd_ent.pack(side="left", padx=5, fill="x", expand=True)
 
-            key_label = ttk.Label(row, text=mapping.get("key") or "[Not mapped]", 
-                                  width=18, relief="sunken", anchor="center")
-            key_label.pack(side="left", padx=8)
+            key_text = mapping.get("key") or "[None]"
+            ttk.Label(row, text=key_text, width=12, relief="sunken", anchor="center").pack(side="left", padx=5)
 
-            def start_mapping(idx=i):
-                app.current_mapping_index = idx
-                app._show_listening_popup(idx)
+            ttk.Button(row, text="Map", width=5, command=lambda idx=i: app._show_listening_popup(idx)).pack(side="left")
+            ttk.Button(row, text="X", width=3, command=lambda idx=i: [app.mapped_commands.pop(idx), rebuild_rows()]).pack(side="left", padx=2)
 
-            ttk.Button(row, text="Map Key", command=start_mapping).pack(side="left", padx=5)
-
-    def _update_command(idx, text):
+    def _update_data(idx, field, text):
         if 0 <= idx < len(app.mapped_commands):
-            app.mapped_commands[idx]["command"] = text
+            app.mapped_commands[idx][field] = text
 
-    def _update_down(idx, text):
-        if 0 <= idx < len(app.mapped_commands):
-            app.mapped_commands[idx]["down_command"] = text
-
-    def _update_up(idx, text):
-        if 0 <= idx < len(app.mapped_commands):
-            app.mapped_commands[idx]["up_command"] = text
-
-    def add_single_command():
-        app.mapped_commands.append({"type": "single", "command": "", "key": None})
+    def add_cmd(mtype):
+        if mtype == "single":
+            app.mapped_commands.append({"type": "single", "command": "", "key": None})
+        else:
+            app.mapped_commands.append({"type": "hold", "down_command": "", "up_command": "", "key": None})
         rebuild_rows()
 
-    def add_hold_command():
-        app.mapped_commands.append({
-            "type": "hold",
-            "down_command": "",
-            "up_command": "",
-            "key": None
-        })
-        rebuild_rows()
-
-    # Buttons
     btn_frame = ttk.Frame(frame)
     btn_frame.pack(pady=10)
-    ttk.Button(btn_frame, text="+ Add Single Command", command=add_single_command).pack(side="left", padx=5)
-    ttk.Button(btn_frame, text="+ Add Hold Command", command=add_hold_command).pack(side="left", padx=5)
+    ttk.Button(btn_frame, text="+ Add Single", command=lambda: add_cmd("single")).pack(side="left", padx=5)
+    ttk.Button(btn_frame, text="+ Add Hold", command=lambda: add_cmd("hold")).pack(side="left", padx=5)
 
-    # Expose refresh function for main.py
     app._refresh_map_buttons = rebuild_rows
-
-    # Initial example
-    if not app.mapped_commands:
-        app.mapped_commands.append({"type": "single", "command": "kill @e[type=armor_stand]", "key": None})
-
     rebuild_rows()

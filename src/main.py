@@ -17,10 +17,7 @@ from settings_tab.settings_gui import create_settings_gui
 from worldedit_tab.worldedit_gui import create_worldedit_schematic_gui
 from modify_properties_tab.modify_properties_gui import create_modify_properties_gui
 
-# Time Recorder imports
-from time_recorder.map_buttons_tab.map_buttons_gui import create_map_buttons_gui
-from time_recorder.timeline_tab.timeline_gui import create_timeline_gui
-from time_recorder.builder_setup_tab.builder_setup_gui import create_builder_setup_gui
+from time_recorder.time_recorder_main import TimeRecorderManager
 
 from clipboard_parser.ClipboardParser import ClipboardCoordinateParser
 from command_processor import CommandProcessor
@@ -104,15 +101,6 @@ class CommandModifierGUI:
         self.scale_z = tk.StringVar(value="-150.0")
         self.modify_properties_cmd_text = None
 
-        # === TIME RECORDER SHARED VARIABLES ===
-        self.mapped_commands = []
-        self.recording_sequence = []
-        self.is_recording = False
-        self.recording_start_time = None
-        self.current_mapping_index = None
-        self._mapping_popup = None
-        self.tick_rate = tk.StringVar(value="20")
-        self._held_keys = set()          # Prevents repeat triggers while key is held
 
         # === MAIN NOTEBOOK ===
         self.main_notebook = ttk.Notebook(self.root)
@@ -168,23 +156,15 @@ class CommandModifierGUI:
         self.cmd_blocks_notebook.add(self.worldedit_frame, text="Add WorldEdit Schematic")
         create_worldedit_schematic_gui(self.worldedit_frame, self)
 
-        # Time Recorder sub-tabs
-        self.time_recorder_notebook = ttk.Notebook(self.time_recorder_frame)
-        self.time_recorder_notebook.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+
+        # Time Recorder (handled by manager)
         self.time_recorder_frame.columnconfigure(0, weight=1)
         self.time_recorder_frame.rowconfigure(0, weight=1)
 
-        self.map_buttons_frame = ttk.Frame(self.time_recorder_notebook)
-        self.timeline_frame = ttk.Frame(self.time_recorder_notebook)
-        self.builder_setup_frame = ttk.Frame(self.time_recorder_notebook)
-
-        self.time_recorder_notebook.add(self.map_buttons_frame, text="Map Buttons")
-        self.time_recorder_notebook.add(self.timeline_frame, text="Timeline")
-        self.time_recorder_notebook.add(self.builder_setup_frame, text="Builder Setup")
-
-        create_map_buttons_gui(self.map_buttons_frame, self)
-        create_timeline_gui(self.timeline_frame, self)
-        create_builder_setup_gui(self.builder_setup_frame, self)
+        self.time_recorder_manager = TimeRecorderManager(
+            self.time_recorder_frame,
+            self
+        )
 
         create_settings_gui(self.settings_frame, self)
 
@@ -198,98 +178,6 @@ class CommandModifierGUI:
 
         self.root.protocol("WM_DELETE_WINDOW", lambda: on_closing(self))
 
-        # Global keyboard listener
-        self._setup_key_listener()
-
-    # ====================== TIME RECORDER HELPERS ======================
-    def _setup_key_listener(self):
-        keyboard.hook(self._on_global_key_press)
-
-    def _on_global_key_press(self, event):
-        if event.event_type not in ("down", "up"):
-            return
-
-        key_name = event.name
-
-        # 1. Mapping mode
-        if self.current_mapping_index is not None:
-            if key_name not in {"esc", "unknown"}:
-                mapping = self.mapped_commands[self.current_mapping_index]
-                mapping["key"] = key_name
-                mapping["type"] = mapping.get("type", "single")
-                self.current_mapping_index = None
-                self.root.after(0, getattr(self, '_refresh_map_buttons', lambda: None))
-
-                if self._mapping_popup:
-                    try:
-                        self._mapping_popup.destroy()
-                    except:
-                        pass
-                    self._mapping_popup = None
-            return
-
-        # 2. Recording mode - Fast & no repeat on hold
-        if not (self.is_recording and self.recording_start_time is not None):
-            return
-
-        for mapping in self.mapped_commands:
-            if mapping.get("key") != key_name:
-                continue
-
-            cmd = None
-            timestamp = time.time() - self.recording_start_time
-
-            if mapping.get("type") == "hold":
-                if event.event_type == "down":
-                    if key_name not in self._held_keys:
-                        self._held_keys.add(key_name)
-                        cmd = mapping.get("down_command")
-                elif event.event_type == "up":
-                    if key_name in self._held_keys:
-                        self._held_keys.discard(key_name)
-                        cmd = mapping.get("up_command")
-            else:  # SINGLE COMMAND - only once per press
-                if event.event_type == "down":
-                    if key_name not in self._held_keys:
-                        self._held_keys.add(key_name)
-                        cmd = mapping.get("command")
-                elif event.event_type == "up":
-                    self._held_keys.discard(key_name)   # allow next press
-
-            if cmd:
-                self._trigger_mapped_command(cmd)
-                self.recording_sequence.append((cmd, timestamp))
-                break
-
-    def _trigger_mapped_command(self, command: str):
-        """Fast command simulation - no unnecessary delays"""
-        if not command:
-            return
-        pyperclip.copy(command.strip())
-        try:
-            keyboard.press_and_release("/")
-            keyboard.press_and_release("ctrl+v")
-            keyboard.press_and_release("enter")
-        except Exception as e:
-            logging.error(f"Simulation error: {e}")
-
-    def _show_listening_popup(self, index):
-        try:
-            if self._mapping_popup:
-                self._mapping_popup.destroy()
-        except:
-            pass
-
-        popup = tk.Toplevel(self.root)
-        popup.title("Mapping Key")
-        popup.geometry("300x120")
-        popup.resizable(False, False)
-        popup.grab_set()
-
-        ttk.Label(popup, text="Listening for key press...", font=("Helvetica", 11)).pack(pady=20)
-        ttk.Label(popup, text="Press any key (ESC to cancel)", foreground="gray").pack()
-
-        self._mapping_popup = popup
 
     # ====================== TAB DETECTION ======================
     def get_current_tab_text(self):
