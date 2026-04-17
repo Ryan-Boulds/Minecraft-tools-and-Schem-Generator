@@ -270,18 +270,8 @@ class TimeRecorderManager:
             self._mapping_popup.destroy()
             self._mapping_popup = None
 
-
     def move_sequence(self, old_index: int, new_index: int):
-        """Reorder sequences by dragging tracks up/down in the builder"""
-        if not (0 <= old_index < len(self.sequences) and 0 <= new_index < len(self.sequences)):
-            return
-        if old_index == new_index:
-            return
-        seq = self.sequences.pop(old_index)
-        self.sequences.insert(new_index, seq)
-        self._refresh_all_ui()
-
-    def move_sequence(self, old_index: int, new_index: int):
+        """Reorder sequences by dragging tracks up/down"""
         if not (0 <= old_index < len(self.sequences) and 0 <= new_index < len(self.sequences)):
             return
         if old_index == new_index:

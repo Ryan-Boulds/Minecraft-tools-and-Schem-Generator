@@ -1,127 +1,112 @@
 # ==================== time_recorder/builder_setup_tab/timeline_canvas.py ====================
 import tkinter as tk
+from tkinter import ttk
 
 def create_timeline_canvas(parent_frame, app):
-    canvas = tk.Canvas(parent_frame, height=480, bg="#f8f8f8", highlightthickness=0)
-    canvas.pack(fill="both", expand=True)
+    container = ttk.Frame(parent_frame)
+    container.pack(fill="both", expand=True)
+
+    canvas = tk.Canvas(container, height=480, bg="#f8f8f8", highlightthickness=0)
+    hbar = ttk.Scrollbar(container, orient="horizontal", command=canvas.xview)
+    canvas.configure(xscrollcommand=hbar.set)
+    
+    hbar.pack(side="bottom", fill="x")
+    canvas.pack(side="top", fill="both", expand=True)
 
     PIXELS_PER_SECOND = [80.0]
-    TRACK_HEIGHT = 70
-    RULER_HEIGHT = 40
-
+    TRACK_HEIGHT = 72
+    RULER_HEIGHT = 45
+    
     selected_clip = [None]
     drag_start_x = [0]
-    drag_start_y = [0]
     drag_start_offset = [0.0]
-    drag_start_index = [None]
+    playhead_seconds = [0.0] 
 
-    def pps():
-        return PIXELS_PER_SECOND[0]
+    def pps(): return PIXELS_PER_SECOND[0]
 
     def draw_timeline():
         canvas.delete("all")
         if not app.sequences:
-            canvas.create_text(450, 200, 
-                text="No timelines yet.\nGo to Timeline tab to record or add sequences.",
-                fill="gray", font=("Arial", 12), justify="center")
+            canvas.create_text(450, 200, text="No sequences loaded.", fill="gray")
             return
 
-        max_time = max((s["offset"] + (s["sequence"][-1][1] if s["sequence"] else 0) 
-                       for s in app.sequences), default=10)
+        times = [s["offset"] + (s["sequence"][-1][1] if s["sequence"] else 2) for s in app.sequences]
+        max_time = max(times) if times else 10
+        # Ensure scrollregion is large enough for the playhead to return to 0
+        canvas.config(scrollregion=(0, 0, max(1000, 200 + max_time * pps()), 480))
 
-        # Ruler
+        # Draw Ruler
         canvas.create_line(50, RULER_HEIGHT, 50 + max_time * pps(), RULER_HEIGHT, fill="black", width=2)
-        for sec in range(0, int(max_time) + 3):
+        for sec in range(0, int(max_time) + 5):
             x = 50 + sec * pps()
-            canvas.create_line(x, RULER_HEIGHT-10, x, RULER_HEIGHT+10, fill="black")
-            canvas.create_text(x, RULER_HEIGHT-20, text=str(sec), font=("Arial", 9))
+            canvas.create_line(x, RULER_HEIGHT-10, x, RULER_HEIGHT, fill="black")
+            canvas.create_text(x, RULER_HEIGHT-22, text=f"{sec}s", font=("Arial", 8))
 
+        # Draw Tracks
         for i, seq in enumerate(app.sequences):
-            y = RULER_HEIGHT + 20 + i * TRACK_HEIGHT
-
-            canvas.create_text(40, y + TRACK_HEIGHT//2, text=seq["name"][:16], 
-                               anchor="e", font=("Arial", 10, "bold"))
-
-            canvas.create_line(50, y + TRACK_HEIGHT//2, 50 + max_time * pps(), 
-                               y + TRACK_HEIGHT//2, fill="#ddd", dash=(4,2))
-
+            y = RULER_HEIGHT + 25 + i * TRACK_HEIGHT
+            canvas.create_text(45, y + 25, text=seq["name"][:12], anchor="e", font=("Arial", 8, "bold"))
+            
             start_x = 50 + seq["offset"] * pps()
-            duration = seq["sequence"][-1][1] if seq["sequence"] else 2
-            width = max(duration * pps(), 80)
-
-            clip_tag = f"clip_{seq['id']}"
-            canvas.create_rectangle(start_x, y+10, start_x+width, y+TRACK_HEIGHT-10,
-                                    fill="#4a90e2", outline="#2171b5", width=3, tags=clip_tag)
-
-            # Red dots for every command
-            for cmd, delay in seq["sequence"]:
+            duration = seq["sequence"][-1][1] if seq["sequence"] else 1
+            width = max(duration * pps(), 60)
+            
+            tag = f"clip_{seq['id']}"
+            canvas.create_rectangle(start_x, y, start_x + width, y + 50, 
+                                    fill="#4a90e2", outline="#2171b5", tags=tag)
+            for _, delay in seq["sequence"]:
                 dot_x = start_x + delay * pps()
-                canvas.create_oval(dot_x-4, y+22, dot_x+4, y+42, fill="#e74c3c", outline="white", tags=clip_tag)
+                canvas.create_oval(dot_x-3, y+22, dot_x+3, y+28, fill="red", outline="white", tags=tag)
 
-            canvas.create_text(start_x + width//2, y + TRACK_HEIGHT//2,
-                               text=f"{len(seq['sequence'])} cmds", 
-                               fill="white", font=("Arial", 9, "bold"), tags=clip_tag)
+        update_playhead(playhead_seconds[0])
 
-    # ====================== DRAG LOGIC ======================
+    def update_playhead(seconds):
+        playhead_seconds[0] = seconds
+        canvas.delete("playhead")
+        
+        px = 50 + (seconds * pps())
+        
+        # --- AUTO-SCROLL LOGIC ---
+        # Get visible boundaries in pixels
+        x_left = canvas.canvasx(0)
+        x_right = x_left + canvas.winfo_width()
+        
+        if px > x_right and canvas.winfo_width() > 1:
+            # Move to next page
+            canvas.xview_moveto(px / float(canvas.cget("scrollregion").split()[2]))
+        elif seconds == 0:
+            # Snap back to beginning when reset
+            canvas.xview_moveto(0)
+
+        canvas.create_line(px, 0, px, 480, fill="#ff0000", width=2, tags="playhead")
+        canvas.create_polygon(px-8, 0, px+8, 0, px+8, 12, px, 20, px-8, 12, fill="#ff0000", tags="playhead")
+
     def on_click(event):
-        items = canvas.find_overlapping(event.x-5, event.y-5, event.x+5, event.y+5)
-        for item in items:
+        cx, cy = canvas.canvasx(event.x), canvas.canvasy(event.y)
+        for item in canvas.find_overlapping(cx-2, cy-2, cx+2, cy+2):
             for tag in canvas.gettags(item):
                 if tag.startswith("clip_"):
-                    seq_id = int(tag.split("_")[1])
-                    for idx, s in enumerate(app.sequences):
-                        if s["id"] == seq_id:
-                            selected_clip[0] = seq_id
-                            drag_start_index[0] = idx
-                            drag_start_x[0] = event.x
-                            drag_start_y[0] = event.y
-                            drag_start_offset[0] = float(s["offset"])   # ensure float
-                            return
+                    sid = int(tag.split("_")[1])
+                    selected_clip[0] = sid
+                    seq = next(s for s in app.sequences if s["id"] == sid)
+                    drag_start_x[0], drag_start_offset[0] = cx, float(seq["offset"])
+                    return
 
     def on_drag(event):
-        if not selected_clip[0]:
-            return
-
-        idx = drag_start_index[0]
-        delta_x = event.x - drag_start_x[0]
-        delta_y = event.y - drag_start_y[0]
-
-        # HORIZONTAL DRAG - Change offset (this is the fix for the top clip)
-        if abs(delta_x) > 6:                     # Lower threshold for better responsiveness
-            current_offset = drag_start_offset[0]
-            new_offset = current_offset + (delta_x / pps())
-            new_offset = max(0.0, round(new_offset, 3))   # Never go below 0
-            app.update_offset(app.sequences[idx]["id"], new_offset)
-
-            # Update start values so continued dragging feels smooth
-            drag_start_x[0] = event.x
-            drag_start_offset[0] = new_offset
-
-        # VERTICAL DRAG - Reorder tracks
-        elif abs(delta_y) > 25:
-            new_index = max(0, min(len(app.sequences)-1, int((event.y - 60) / TRACK_HEIGHT)))
-            if new_index != idx:
-                app.move_sequence(idx, new_index)
-                drag_start_index[0] = new_index
-
-    def on_release(event):
-        selected_clip[0] = None
+        if selected_clip[0] is None: return
+        cx = canvas.canvasx(event.x)
+        seq = next(s for s in app.sequences if s["id"] == selected_clip[0])
+        new_off = max(0.0, drag_start_offset[0] + (cx - drag_start_x[0]) / pps())
+        seq["offset"] = round(new_off, 3)
         draw_timeline()
 
-    # ====================== ZOOM ======================
-    def on_mouse_wheel(event):
-        if event.state & 0x4:   # Ctrl pressed
-            if event.delta > 0:
-                PIXELS_PER_SECOND[0] = min(400, PIXELS_PER_SECOND[0] * 1.25)
-            else:
-                PIXELS_PER_SECOND[0] = max(20, PIXELS_PER_SECOND[0] / 1.25)
-            draw_timeline()
-
-    # Bindings
     canvas.bind("<Button-1>", on_click)
     canvas.bind("<B1-Motion>", on_drag)
-    canvas.bind("<ButtonRelease-1>", on_release)
-    canvas.bind("<MouseWheel>", on_mouse_wheel)
+    canvas.bind("<ButtonRelease-1>", lambda e: [selected_clip.pop(0), selected_clip.append(None), draw_timeline()])
+    canvas.bind("<MouseWheel>", lambda e: (
+        PIXELS_PER_SECOND.__setitem__(0, max(10, min(1000, pps() * (1.1 if e.delta > 0 else 0.9)))) 
+        if e.state & 0x4 else canvas.xview_scroll(int(-1*(e.delta/120)), "units"), draw_timeline()))
 
     app._refresh_builder = draw_timeline
+    app._update_playhead = update_playhead
     draw_timeline()
