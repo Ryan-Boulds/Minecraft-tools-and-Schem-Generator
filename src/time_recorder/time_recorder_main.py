@@ -243,17 +243,17 @@ class TimeRecorderManager:
             break
 
     def _trigger_minecraft_command(self, command: str):
-        """Improved reliability for sending commands"""
+        """Improved reliability for sending commands to Minecraft"""
         if not command:
             return
         pyperclip.copy(command.strip())
         try:
             keyboard.press_and_release("/")
-            time.sleep(0.05)
+            time.sleep(0.04)      # Time for chat to open
             keyboard.press_and_release("ctrl+v")
-            time.sleep(0.08)
+            time.sleep(0.05)      # Critical delay for paste
             keyboard.press_and_release("enter")
-            time.sleep(0.03)
+            time.sleep(0.06)      # Cooldown before next command
         except Exception as e:
             print(f"Command trigger error: {e}")
 
@@ -269,3 +269,23 @@ class TimeRecorderManager:
         if self._mapping_popup:
             self._mapping_popup.destroy()
             self._mapping_popup = None
+
+
+    def move_sequence(self, old_index: int, new_index: int):
+        """Reorder sequences by dragging tracks up/down in the builder"""
+        if not (0 <= old_index < len(self.sequences) and 0 <= new_index < len(self.sequences)):
+            return
+        if old_index == new_index:
+            return
+        seq = self.sequences.pop(old_index)
+        self.sequences.insert(new_index, seq)
+        self._refresh_all_ui()
+
+    def move_sequence(self, old_index: int, new_index: int):
+        if not (0 <= old_index < len(self.sequences) and 0 <= new_index < len(self.sequences)):
+            return
+        if old_index == new_index:
+            return
+        seq = self.sequences.pop(old_index)
+        self.sequences.insert(new_index, seq)
+        self._refresh_all_ui()

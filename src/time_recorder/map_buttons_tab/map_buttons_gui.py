@@ -1,21 +1,128 @@
 # ==================== time_recorder/map_buttons_tab/map_buttons_gui.py ====================
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
+from pynput import keyboard as pynput_keyboard
+import threading
 
 def create_map_buttons_gui(parent, app):
     frame = ttk.Frame(parent)
     frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-    # === TOP TOOLBAR (Save / Load on EVERY tab) ===
+    # === TOP TOOLBAR ===
     toolbar = ttk.Frame(frame)
     toolbar.pack(fill="x", pady=(0, 10))
 
     ttk.Button(toolbar, text="💾 Save Project", command=app.save_project).pack(side="left", padx=5)
     ttk.Button(toolbar, text="📂 Load Project", command=app.load_project).pack(side="left", padx=5)
 
-    # --- Rest of the original Map Buttons GUI ---
     ttk.Label(toolbar, text="Mapped Commands", font=("Helvetica", 12, "bold")).pack(side="left", padx=20)
 
+    # === ACTIVATE / DEACTIVATE BUTTON (Top Right) ===
+    activate_btn = ttk.Button(toolbar, text="Activate", style="Green.TButton")
+    activate_btn.pack(side="right", padx=10)
+
+    style = ttk.Style()
+    style.configure("Green.TButton", foreground="green", font=("Helvetica", 10, "bold"))
+    style.configure("Red.TButton", foreground="red", font=("Helvetica", 10, "bold"))
+
+    is_activated = [False]
+    listener = [None]
+    currently_pressed = set()   # Prevents spamming on hold
+
+    status_label = ttk.Label(frame, text="Keybinds INACTIVE", 
+                           font=("Helvetica", 10), foreground="gray")
+    status_label.pack(pady=(0, 10))
+
+    def on_press(key):
+        """Called when a key is pressed (including repeats, but we filter them)"""
+        try:
+            key_name = key.char if key.char else str(key).replace("Key.", "")
+        except:
+            key_name = str(key).replace("Key.", "")
+
+        if key_name in currently_pressed:
+            return  # Already handling this hold → prevent spam
+
+        currently_pressed.add(key_name)
+
+        # Find matching mapping
+        for mapping in app.mapped_commands:
+            if mapping.get("key") and mapping.get("key").lower() == key_name.lower():
+                mtype = mapping.get("type", "single")
+
+                if mtype == "hold":
+                    cmd = mapping.get("down_command")
+                    if cmd:
+                        app._trigger_minecraft_command(cmd)
+                else:
+                    # Single command on press
+                    cmd = mapping.get("command")
+                    if cmd:
+                        app._trigger_minecraft_command(cmd)
+                break
+
+    def on_release(key):
+        """Called when a key is released"""
+        try:
+            key_name = key.char if key.char else str(key).replace("Key.", "")
+        except:
+            key_name = str(key).replace("Key.", "")
+
+        if key_name in currently_pressed:
+            currently_pressed.remove(key_name)
+
+        # Check for hold "up" command
+        for mapping in app.mapped_commands:
+            if mapping.get("key") and mapping.get("key").lower() == key_name.lower():
+                if mapping.get("type") == "hold":
+                    cmd = mapping.get("up_command")
+                    if cmd:
+                        app._trigger_minecraft_command(cmd)
+                break
+
+    def toggle_activation():
+        if not is_activated[0]:
+            # === ACTIVATE ===
+            if not app.mapped_commands:
+                messagebox.showwarning("No Mappings", "Please add at least one mapped command first!")
+                return
+
+            # Stop any old listener
+            if listener[0]:
+                try:
+                    listener[0].stop()
+                except:
+                    pass
+
+            # Start fresh pynput listener
+            listener[0] = pynput_keyboard.Listener(on_press=on_press, on_release=on_release)
+            listener[0].start()
+
+            currently_pressed.clear()
+            is_activated[0] = True
+            activate_btn.config(text="Deactivate", style="Red.TButton")
+            status_label.config(
+                text="✅ Keybinds ACTIVE — Use mapped keys in Minecraft",
+                foreground="green"
+            )
+
+        else:
+            # === DEACTIVATE ===
+            if listener[0]:
+                try:
+                    listener[0].stop()
+                except:
+                    pass
+                listener[0] = None
+
+            currently_pressed.clear()
+            is_activated[0] = False
+            activate_btn.config(text="Activate", style="Green.TButton")
+            status_label.config(text="Keybinds INACTIVE", foreground="gray")
+
+    activate_btn.config(command=toggle_activation)
+
+    # === Mapping rows (unchanged from your original) ===
     rows_frame = ttk.Frame(frame)
     rows_frame.pack(fill="both", expand=True)
 
@@ -72,3 +179,6 @@ def create_map_buttons_gui(parent, app):
 
     app._refresh_map_buttons = rebuild_rows
     rebuild_rows()
+
+    # Start in inactive state
+    toggle_activation()
