@@ -24,6 +24,9 @@ class TimeRecorderManager:
         self.current_mapping_index = None
         self._mapping_popup = None
         self.recording_sequence = []    # temporary during live recording
+        self.audio_path = None
+        self.audio_waveform = None
+        self.audio_duration = 0.0
 
         # Prevent keyboard repeat spam
         self._currently_pressed = set()

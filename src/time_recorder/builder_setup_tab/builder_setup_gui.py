@@ -1,6 +1,7 @@
 # ==================== time_recorder/builder_setup_tab/builder_setup_gui.py ====================
 import tkinter as tk
 from tkinter import ttk
+from .audio_handler import load_audio_data
 
 from .timeline_canvas import create_timeline_canvas
 from .playback import start_playback
@@ -41,3 +42,5 @@ def create_builder_setup_gui(parent, app):
 
     # Store refresh function for main app
     app._refresh_builder = None  # Will be set by timeline_canvas.py
+    
+    ttk.Button(toolbar, text="🎵 Import Audio", command=lambda: load_audio_data(app)).pack(side="left", padx=5)

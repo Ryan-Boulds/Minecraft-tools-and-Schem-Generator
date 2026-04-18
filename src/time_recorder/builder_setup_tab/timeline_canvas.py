@@ -26,25 +26,50 @@ def create_timeline_canvas(parent_frame, app):
 
     def draw_timeline():
         canvas.delete("all")
-        if not app.sequences:
-            canvas.create_text(450, 200, text="No sequences loaded.", fill="gray")
+        if not app.sequences and app.audio_waveform is None:
+            canvas.create_text(450, 200, text="No sequences or audio loaded.", fill="gray")
             return
 
+        # Calculate total width needed
         times = [s["offset"] + (s["sequence"][-1][1] if s["sequence"] else 2) for s in app.sequences]
+        if app.audio_waveform is not None:
+            times.append(app.audio_duration)
+            
         max_time = max(times) if times else 10
-        # Ensure scrollregion is large enough for the playhead to return to 0
         canvas.config(scrollregion=(0, 0, max(1000, 200 + max_time * pps()), 480))
 
-        # Draw Ruler
+        # --- Draw Ruler ---
         canvas.create_line(50, RULER_HEIGHT, 50 + max_time * pps(), RULER_HEIGHT, fill="black", width=2)
         for sec in range(0, int(max_time) + 5):
             x = 50 + sec * pps()
             canvas.create_line(x, RULER_HEIGHT-10, x, RULER_HEIGHT, fill="black")
             canvas.create_text(x, RULER_HEIGHT-22, text=f"{sec}s", font=("Arial", 8))
 
-        # Draw Tracks
+        # --- AUDIO TRACK (TOP) ---
+        track_y_offset = 0
+        if app.audio_waveform is not None:
+            track_y_offset = 65  # Room for the waveform track
+            audio_center_y = RULER_HEIGHT + 35
+            audio_height = 50
+            
+            samples = len(app.audio_waveform)
+            pixels_total = app.audio_duration * pps()
+            
+            # Draw waveform lines (stepping based on pixels to maintain performance)
+            step = max(1, int(samples / pixels_total))
+            for i in range(0, samples, step):
+                x = 50 + (i / samples) * pixels_total
+                amplitude = app.audio_waveform[i] * (audio_height / 2)
+                canvas.create_line(x, audio_center_y - amplitude, 
+                                   x, audio_center_y + amplitude, 
+                                   fill="#7f8c8d", tags="waveform")
+            
+            canvas.create_text(45, audio_center_y, text="AUDIO", 
+                               anchor="e", font=("Arial", 8, "bold"))
+
+        # --- COMMAND TRACKS ---
         for i, seq in enumerate(app.sequences):
-            y = RULER_HEIGHT + 25 + i * TRACK_HEIGHT
+            y = RULER_HEIGHT + 25 + track_y_offset + i * TRACK_HEIGHT
             canvas.create_text(45, y + 25, text=seq["name"][:12], anchor="e", font=("Arial", 8, "bold"))
             
             start_x = 50 + seq["offset"] * pps()
@@ -54,6 +79,8 @@ def create_timeline_canvas(parent_frame, app):
             tag = f"clip_{seq['id']}"
             canvas.create_rectangle(start_x, y, start_x + width, y + 50, 
                                     fill="#4a90e2", outline="#2171b5", tags=tag)
+            
+            # Draw command dots
             for _, delay in seq["sequence"]:
                 dot_x = start_x + delay * pps()
                 canvas.create_oval(dot_x-3, y+22, dot_x+3, y+28, fill="red", outline="white", tags=tag)
