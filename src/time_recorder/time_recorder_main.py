@@ -4,6 +4,7 @@ import keyboard
 import json
 import time
 import pyperclip
+import copy
 
 class TimeRecorderManager:
     """Manages all Time Recorder logic and sub-tabs as a single project"""
@@ -23,13 +24,17 @@ class TimeRecorderManager:
         self.recording_start_time = None
         self.current_mapping_index = None
         self._mapping_popup = None
-        self.recording_sequence = []    # temporary during live recording
+        self.recording_sequence = []    
         self.audio_path = None
         self.audio_waveform = None
         self.audio_duration = 0.0
 
         # Prevent keyboard repeat spam
         self._currently_pressed = set()
+
+        # === UNDO SYSTEM ===
+        self.undo_stack = []          # List of (description, sequences_snapshot)
+        self.max_undo = 20
 
         # Make the app more reliable when Minecraft is focused
         self._make_background_friendly()
@@ -38,26 +43,21 @@ class TimeRecorderManager:
         self.setup_key_listener()
 
     def _make_background_friendly(self):
-        """Improves reliability when switching focus to Minecraft"""
         root = self.main_app.root
         try:
-            # Keep window on top but reduce focus stealing
             root.attributes("-topmost", True)
             root.update_idletasks()
-
-            # Windows-specific: make window act more like a tool window
             hwnd = root.winfo_id()
             import ctypes
             GWL_EXSTYLE = -20
             WS_EX_NOACTIVATE = 0x08000000
             WS_EX_TOOLWINDOW = 0x00000080
-            
             user32 = ctypes.windll.user32
             style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
             style |= WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW
             user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
         except Exception:
-            pass  # Not critical if it fails
+            pass
 
     def _build_sub_tabs(self):
         self.notebook = ttk.Notebook(self.frame)
@@ -66,23 +66,41 @@ class TimeRecorderManager:
         self.frame.rowconfigure(0, weight=1)
 
         self.map_buttons_frame = ttk.Frame(self.notebook)
-        self.timeline_frame = ttk.Frame(self.notebook)
         self.builder_setup_frame = ttk.Frame(self.notebook)
 
         self.notebook.add(self.map_buttons_frame, text="Map Buttons")
-        self.notebook.add(self.timeline_frame, text="Timeline")
         self.notebook.add(self.builder_setup_frame, text="Builder Setup")
 
         from .map_buttons_tab.map_buttons_gui import create_map_buttons_gui
-        from .timeline_tab.timeline_gui import create_timeline_gui
         from .builder_setup_tab.builder_setup_gui import create_builder_setup_gui
 
         create_map_buttons_gui(self.map_buttons_frame, self)
-        create_timeline_gui(self.timeline_frame, self)
         create_builder_setup_gui(self.builder_setup_frame, self)
 
-    # ====================== UNIFIED SAVE / LOAD ======================
+    # ====================== UNDO SYSTEM ======================
+    def _push_undo(self, description: str):
+        """Save current sequences state before a change"""
+        snapshot = copy.deepcopy(self.sequences)
+        self.undo_stack.append((description, snapshot))
+        if len(self.undo_stack) > self.max_undo:
+            self.undo_stack.pop(0)
 
+    def undo(self):
+        """Perform undo (Ctrl+Z)"""
+        if not self.undo_stack:
+            if hasattr(self, "_log_message"):
+                self._log_message("Nothing to undo")
+            return
+
+        description, previous_state = self.undo_stack.pop()
+        self.sequences = previous_state
+
+        if hasattr(self, "_log_message"):
+            self._log_message(f"↩ Undid: {description}")
+
+        self._refresh_all_ui()
+
+    # ====================== SAVE / LOAD ======================
     def save_project(self):
         filepath = filedialog.asksaveasfilename(
             defaultextension=".json",
@@ -139,47 +157,71 @@ class TimeRecorderManager:
                 self.sequences.append(seq)
                 self.next_sequence_id = max(self.next_sequence_id, seq["id"] + 1)
 
+            self.undo_stack.clear()  # Clear undo on load
             self._refresh_all_ui()
-            messagebox.showinfo("Project Loaded", "Mappings + all layered timelines restored.")
+            messagebox.showinfo("Project Loaded", "Mappings + timelines restored.")
         except Exception as e:
             messagebox.showerror("Load Error", str(e))
 
     def _refresh_all_ui(self):
         if hasattr(self, "_refresh_map_buttons"):
             self.main_app.root.after(0, self._refresh_map_buttons)
-        if hasattr(self, "_refresh_timeline_list"):
-            self.main_app.root.after(0, self._refresh_timeline_list)
-        if hasattr(self, "_refresh_builder"):
+        if hasattr(self, "_refresh_builder") and self._refresh_builder:
             self.main_app.root.after(0, self._refresh_builder)
 
-    # ====================== SEQUENCE MANAGEMENT ======================
-
-    def add_sequence(self, name=None, sequence=None, offset=0.0):
-        if name is None:
-            name = f"Sequence {len(self.sequences) + 1}"
-        if sequence is None:
-            sequence = []
-        seq = {
+    def add_sequence(self, name, sequence, offset=0.0):
+        self._push_undo(f"Add sequence '{name}'")
+        new_seq = {
             "id": self.next_sequence_id,
             "name": name,
-            "offset": float(offset),
-            "sequence": list(sequence)
+            "sequence": sequence,
+            "offset": offset,
+            "visible": True
         }
-        self.sequences.append(seq)
+        self.sequences.append(new_seq)
         self.next_sequence_id += 1
         self._refresh_all_ui()
-        return seq["id"]
 
     def delete_sequence(self, seq_id):
-        self.sequences = [s for s in self.sequences if s["id"] != seq_id]
-        self._refresh_all_ui()
+        seq = next((s for s in self.sequences if s["id"] == seq_id), None)
+        if seq:
+            self._push_undo(f"Delete sequence '{seq['name']}'")
+            self.sequences = [s for s in self.sequences if s["id"] != seq_id]
+            self._refresh_all_ui()
 
-    def update_offset(self, seq_id, new_offset):
-        for s in self.sequences:
-            if s["id"] == seq_id:
-                s["offset"] = float(new_offset)
-                self._refresh_all_ui()
-                break
+    # ====================== SPLIT (with undo) ======================
+    def split_sequence(self, seq_id: int, split_time: float):
+        for i, seq in enumerate(self.sequences):
+            if seq["id"] == seq_id:
+                self._push_undo(f"Split '{seq['name']}' at {split_time:.2f}s")
+
+                offset = seq["offset"]
+                if not seq["sequence"]:
+                    messagebox.showwarning("Cannot Split", "This sequence has no commands.")
+                    return
+
+                seq_duration = seq["sequence"][-1][1] if seq["sequence"] else 0
+                rel_split = split_time - offset
+
+                if rel_split <= 0 or rel_split >= seq_duration + 0.001:
+                    messagebox.showwarning("Split Position", 
+                        "Playhead must be inside the clip (not at the very start or end).")
+                    return
+
+                part1 = [(cmd, ts) for cmd, ts in seq["sequence"] if ts < rel_split]
+                part2 = [(cmd, ts - rel_split) for cmd, ts in seq["sequence"] if ts >= rel_split]
+
+                base_name = seq["name"]
+                del self.sequences[i]
+
+                self.add_sequence(name=f"{base_name} - Part 1", sequence=part1, offset=offset)
+                self.add_sequence(name=f"{base_name} - Part 2", sequence=part2, offset=split_time)
+
+                if hasattr(self, "_log_message"):
+                    self._log_message(f"✂ Split '{base_name}' at {split_time:.2f}s")
+                return
+
+        messagebox.showwarning("Split Error", "Sequence not found.")
 
     def get_merged_timeline(self):
         events = []
@@ -190,16 +232,22 @@ class TimeRecorderManager:
         events.sort(key=lambda x: x[0])
         return events
 
-    # ====================== KEYBOARD LOGIC ======================
-
+    # ====================== KEYBOARD ======================
     def setup_key_listener(self):
-        keyboard.unhook_all()  # Prevent duplicate hooks
+        keyboard.unhook_all()
         keyboard.hook(self._on_global_key_press)
 
     def _on_global_key_press(self, event):
         key_name = event.name
 
-        # 1. KEY MAPPING MODE
+        # === UNDO: Ctrl + Z ===
+        if event.event_type == "down":
+            if (key_name == "z" and 
+                (keyboard.is_pressed("ctrl") or keyboard.is_pressed("control"))):
+                self.undo()
+                return
+
+        # Mapping mode
         if self.current_mapping_index is not None:
             if event.event_type == "down" and key_name != "esc":
                 self.mapped_commands[self.current_mapping_index]["key"] = key_name
@@ -208,7 +256,7 @@ class TimeRecorderManager:
                 self.main_app.root.after(0, self._refresh_map_buttons)
             return
 
-        # 2. RECORDING MODE - Works even when Minecraft is focused
+        # Recording mode
         if not (self.is_recording and self.recording_start_time is not None):
             return
 
@@ -222,18 +270,16 @@ class TimeRecorderManager:
 
             if mtype == "hold":
                 if event.event_type == "down":
-                    if key_name in self._currently_pressed:
-                        return
+                    if key_name in self._currently_pressed: return
                     self._currently_pressed.add(key_name)
                     cmd = mapping.get("down_command")
                 elif event.event_type == "up":
                     if key_name in self._currently_pressed:
                         self._currently_pressed.remove(key_name)
                     cmd = mapping.get("up_command")
-            else:  # SINGLE
+            else:
                 if event.event_type == "down":
-                    if key_name in self._currently_pressed:
-                        return
+                    if key_name in self._currently_pressed: return
                     self._currently_pressed.add(key_name)
                     cmd = mapping.get("command")
                 elif event.event_type == "up":
@@ -242,21 +288,26 @@ class TimeRecorderManager:
 
             if cmd:
                 self.recording_sequence.append((cmd, timestamp))
+                if hasattr(self, "_log_message"):
+                    tps = float(self.tick_rate.get() or 20)
+                    current_tick = round(timestamp * tps)
+                    display_cmd = cmd.strip().lstrip('/')[:37] + ("..." if len(cmd.strip().lstrip('/')) > 40 else "")
+                    log_entry = f"Tick {current_tick:05d} | {key_name.upper()} -> {display_cmd}"
+                    self.main_app.root.after(0, lambda: self._log_message(log_entry))
+
                 self._trigger_minecraft_command(cmd)
             break
 
     def _trigger_minecraft_command(self, command: str):
-        """Improved reliability for sending commands to Minecraft"""
-        if not command:
-            return
+        if not command: return
         pyperclip.copy(command.strip())
         try:
             keyboard.press_and_release("/")
-            time.sleep(0.04)      # Time for chat to open
+            time.sleep(0.04)
             keyboard.press_and_release("ctrl+v")
-            time.sleep(0.05)      # Critical delay for paste
+            time.sleep(0.05)
             keyboard.press_and_release("enter")
-            time.sleep(0.06)      # Cooldown before next command
+            time.sleep(0.06)
         except Exception as e:
             print(f"Command trigger error: {e}")
 
@@ -274,11 +325,11 @@ class TimeRecorderManager:
             self._mapping_popup = None
 
     def move_sequence(self, old_index: int, new_index: int):
-        """Reorder sequences by dragging tracks up/down"""
         if not (0 <= old_index < len(self.sequences) and 0 <= new_index < len(self.sequences)):
             return
         if old_index == new_index:
             return
+        self._push_undo("Reorder sequences")
         seq = self.sequences.pop(old_index)
         self.sequences.insert(new_index, seq)
         self._refresh_all_ui()
