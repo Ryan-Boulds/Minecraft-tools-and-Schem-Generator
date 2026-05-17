@@ -9,36 +9,25 @@ from .loader import load_schematic
 from .converter import (
     generate_block_list,
     convert_to_command_blocks,
-    convert_to_command_block_wall
+    convert_to_command_block_wall,
+    convert_to_command_block_wall_projected   # ← NEW
 )
 
 
 def create_converter_subframe(parent, gui, back_callback):
     frame = tk.Frame(parent, bg='#f0f0f0')
     frame.columnconfigure(0, weight=1)
-    frame.rowconfigure(4, weight=1)  # text area expands
+    frame.rowconfigure(4, weight=1)
 
-    # ─── Back button + Title ───────────────────────────────────────
+    # Header
     header = tk.Frame(frame, bg='#f0f0f0')
     header.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(8, 12))
 
-    tk.Button(
-        header,
-        text="← Back",
-        command=back_callback,
-        font=("Arial", 11, "bold"),
-        bg="#555555",
-        fg="white",
-        activebackground="#444444",
-        width=8
-    ).pack(side="left", padx=10)
+    tk.Button(header, text="← Back", command=back_callback, font=("Arial", 11, "bold"),
+              bg="#555555", fg="white", activebackground="#444444", width=8).pack(side="left", padx=10)
 
-    tk.Label(
-        header,
-        text="Schematic → Command Blocks Converter",
-        font=("Arial", 14, "bold"),
-        bg='#f0f0f0'
-    ).pack(side="left", padx=20)
+    tk.Label(header, text="Schematic → Command Blocks Converter",
+             font=("Arial", 14, "bold"), bg='#f0f0f0').pack(side="left", padx=20)
 
     # File selection
     top_frame = tk.Frame(frame, bg='#f0f0f0')
@@ -47,8 +36,7 @@ def create_converter_subframe(parent, gui, back_callback):
     tk.Label(top_frame, text="Schematic File:", bg='#f0f0f0').pack(side="left")
     file_path_var = tk.StringVar()
     tk.Entry(top_frame, textvariable=file_path_var, width=60).pack(side="left", padx=8, fill="x", expand=True)
-    tk.Button(top_frame, text="Browse",
-              command=lambda: _browse_file(file_path_var),
+    tk.Button(top_frame, text="Browse", command=lambda: _browse_file(file_path_var),
               bg='#2196F3', fg='white').pack(side="left")
 
     # Player position
@@ -63,7 +51,7 @@ def create_converter_subframe(parent, gui, back_callback):
     tk.Entry(pos_frame, textvariable=player_y, width=8).pack(side="left", padx=4)
     tk.Entry(pos_frame, textvariable=player_z, width=8).pack(side="left", padx=4)
 
-    # Wall controls
+    # Controls
     wall_frame = tk.Frame(frame, bg='#f0f0f0')
     wall_frame.grid(row=3, column=0, columnspan=3, sticky="ew", padx=10, pady=6)
 
@@ -73,15 +61,11 @@ def create_converter_subframe(parent, gui, back_callback):
 
     tk.Label(wall_frame, text="Facing:", bg='#f0f0f0').pack(side="left", padx=12)
     facing_var = tk.StringVar(value="north")
-    ttk.Combobox(
-        wall_frame,
-        textvariable=facing_var,
-        values=["north", "south", "east", "west"],
-        width=10,
-        state="readonly"
-    ).pack(side="left")
+    ttk.Combobox(wall_frame, textvariable=facing_var,
+                 values=["north", "south", "east", "west"],
+                 width=10, state="readonly").pack(side="left")
 
-    # Output text area
+    # Output
     text_list = tk.Text(frame, height=18, font=("Consolas", 10), wrap="word", bg="#fdfdfd")
     text_list.grid(row=4, column=0, columnspan=3, sticky="nsew", padx=10, pady=8)
 
@@ -98,6 +82,9 @@ def create_converter_subframe(parent, gui, back_callback):
     def generate_wall():
         _run_generator(text_list, file_path_var, player_x, player_y, player_z, wall_width_var, facing_var, mode="wall")
 
+    def generate_projected():
+        _run_generator(text_list, file_path_var, player_x, player_y, player_z, wall_width_var, facing_var, mode="projected")
+
     tk.Button(btn_frame, text="Show Block List", command=generate_list,
               bg='#4CAF50', fg='white', width=18).pack(side="left", padx=6)
 
@@ -106,6 +93,10 @@ def create_converter_subframe(parent, gui, back_callback):
 
     tk.Button(btn_frame, text="Generate Command Block WALL", command=generate_wall,
               bg='#673AB7', fg='white', width=26).pack(side="left", padx=6)
+
+    # NEW BUTTON
+    tk.Button(btn_frame, text="Generate PROJECTED Wall", command=generate_projected,
+              bg='#9C27B0', fg='white', width=26).pack(side="left", padx=6)
 
     return frame
 
@@ -145,8 +136,10 @@ def _run_generator(text_widget, file_var, px_var, py_var, pz_var, ww_var, facing
 
     if mode == "original":
         new_root = convert_to_command_blocks(data, (px, py, pz))
-    else:  # wall
+    elif mode == "wall":
         new_root = convert_to_command_block_wall(data, (px, py, pz), wall_width, facing)
+    elif mode == "projected":
+        new_root = convert_to_command_block_wall_projected(data, (px, py, pz), facing)
 
     out_path = filedialog.asksaveasfilename(
         defaultextension=".schem",

@@ -29,11 +29,18 @@ class TimeRecorderManager:
         self.audio_waveform = None
         self.audio_duration = 0.0
 
+        # Prevent overlapping command sends during recording
+        self._command_lock = False
+
+        # Recording send delay (used by builder_setup_gui.py)
+        if not hasattr(self, 'record_send_delay'):
+            self.record_send_delay = tk.StringVar(value="80")
+
         # Prevent keyboard repeat spam
         self._currently_pressed = set()
 
         # === UNDO SYSTEM ===
-        self.undo_stack = []          # List of (description, sequences_snapshot)
+        self.undo_stack = []          
         self.max_undo = 20
 
         # Make the app more reliable when Minecraft is focused
@@ -260,6 +267,9 @@ class TimeRecorderManager:
         if not (self.is_recording and self.recording_start_time is not None):
             return
 
+        if getattr(self, '_command_lock', False):
+            return   # Don't process new keys while sending
+        
         for mapping in self.mapped_commands:
             if mapping.get("key") != key_name:
                 continue
@@ -298,18 +308,48 @@ class TimeRecorderManager:
                 self._trigger_minecraft_command(cmd)
             break
 
+    # ====================== COMMAND EXECUTION ======================
     def _trigger_minecraft_command(self, command: str):
-        if not command: return
-        pyperclip.copy(command.strip())
+        if not command:
+            return
+
+        if getattr(self, '_command_lock', False):
+            return
+
+        self._command_lock = True
+
         try:
+            pyperclip.copy(command.strip())
+            
+            # Safe delay reading
+            try:
+                delay_ms = float(getattr(self, 'record_send_delay', tk.StringVar(value="80")).get() or 80)
+            except:
+                delay_ms = 80
+                
+            delay = max(0.04, delay_ms / 1000.0)
+
             keyboard.press_and_release("/")
-            time.sleep(0.04)
+            time.sleep(0.035)
             keyboard.press_and_release("ctrl+v")
-            time.sleep(0.05)
+            time.sleep(delay)
             keyboard.press_and_release("enter")
-            time.sleep(0.06)
+            time.sleep(0.045)
+
+            if hasattr(self, "_log_message"):
+                self._log_message(f"→ Sent: {command.strip()[:50]}...")
+
         except Exception as e:
             print(f"Command trigger error: {e}")
+            if hasattr(self, "_log_message"):
+                self._log_message(f"❌ Send failed: {e}")
+
+        finally:
+            self.main_app.root.after(60, self._release_command_lock)
+
+    def _release_command_lock(self):
+        """Safely release the command lock"""
+        self._command_lock = False
 
     def _show_listening_popup(self, index):
         self.current_mapping_index = index

@@ -1,15 +1,13 @@
 # ==================== time_recorder/builder_setup_tab/builder_setup_gui.py ====================
 import tkinter as tk
 from tkinter import ttk
-import time  # Needed for the log timestamp and internal timing fixes
+import time
 
 from .recorder import start_record_layer
 from .audio_handler import load_audio_data
 from .timeline_canvas import create_timeline_canvas
 from .playback import start_playback
 from .repeater_timing import show_repeater_timing
-
-# Import for the new Export functionality
 from ..timeline_exporter import export_timeline_to_schematic
 
 
@@ -25,7 +23,6 @@ def create_builder_setup_gui(parent, app):
     ttk.Button(toolbar, text="📂 Load Project", command=app.load_project).pack(side="left", padx=5)
     ttk.Button(toolbar, text="🎵 Import Audio", command=lambda: load_audio_data(app)).pack(side="left", padx=5)
 
-    # NEW EXPORT BUTTON (top right, above record button)
     ttk.Button(
         toolbar, 
         text="📤 Export Timeline Schematic",
@@ -39,7 +36,12 @@ def create_builder_setup_gui(parent, app):
     control_frame.pack(fill="x", pady=8)
 
     ttk.Label(control_frame, text="Tick Rate (ticks/sec): ").pack(side="left")
-    ttk.Entry(control_frame, textvariable=app.tick_rate, width=10).pack(side="left", padx=5)
+    ttk.Entry(control_frame, textvariable=app.tick_rate, width=8).pack(side="left", padx=5)
+
+    # NEW: Recording Send Delay
+    ttk.Label(control_frame, text="   Record Send Delay (ms): ").pack(side="left")
+    app.record_send_delay = tk.StringVar(value="80")   # Default 80ms - quite fast but stable
+    ttk.Entry(control_frame, textvariable=app.record_send_delay, width=6).pack(side="left", padx=5)
 
     # Record Button
     record_btn = ttk.Button(
@@ -62,15 +64,13 @@ def create_builder_setup_gui(parent, app):
         command=lambda: show_repeater_timing(app)
     ).pack(side="right", padx=5)
 
-    # --- VISUAL TIMELINE ---
+    # --- Rest of the GUI (canvas + log) unchanged ---
     canvas_label = "Visual Timeline - Drag clips left/right • Drag up/down to reorder • Ctrl+Wheel to zoom"
     canvas_frame = ttk.LabelFrame(frame, text=canvas_label)
     canvas_frame.pack(fill="both", expand=True, pady=10)
 
-    # Initialize the canvas
     create_timeline_canvas(canvas_frame, app)
 
-    # --- LIVE LOG ---
     log_frame = ttk.LabelFrame(frame, text="Live Activity Log")
     log_frame.pack(fill="x", side="bottom", pady=(10, 0))
     
@@ -81,7 +81,6 @@ def create_builder_setup_gui(parent, app):
     log_scroll.pack(side="right", fill="y")
     log_text.config(yscrollcommand=log_scroll.set)
 
-    # Function for the app to update this log
     def update_log(message):
         try:
             log_text.config(state="normal")
@@ -92,4 +91,4 @@ def create_builder_setup_gui(parent, app):
         except Exception as e:
             print(f"Log error: {e}")
 
-    app._log_message = update_log  # Store reference in main manager for global access
+    app._log_message = update_log

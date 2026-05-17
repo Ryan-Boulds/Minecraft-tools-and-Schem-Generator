@@ -1,16 +1,12 @@
 # worldedit_tab/worldedit_gui.py
-from .command_block_generator.gui import create_converter_subframe
 import tkinter as tk
 from tkinter import ttk
-from tkinter import filedialog
-import threading
 
-from .schematic_generator import generate_schematic
-from .schem_viewer.viewer import SchematicViewer
+from .command_block_generator.gui import create_converter_subframe
 
 
 def create_worldedit_schematic_gui(frame, gui):
-    """Create a GUI tab for generating and viewing WorldEdit schematic files."""
+    """WorldEdit Schematic Tab - Now ONLY the Schem → Command Blocks Converter"""
     canvas = tk.Canvas(frame)
     scrollbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
     scrollable_frame = ttk.Frame(canvas)
@@ -28,114 +24,6 @@ def create_worldedit_schematic_gui(frame, gui):
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(0, weight=1)
 
-    # Store reference to main content frame so we can hide/show it
-    main_content_frame = tk.Frame(scrollable_frame, bg='#f0f0f0')
-    main_content_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-    scrollable_frame.columnconfigure(0, weight=1)
-    scrollable_frame.rowconfigure(0, weight=1)
-
-    # ───────────────────────────────────────────────
-    #           Header row with button on the right
-    # ───────────────────────────────────────────────
-    header_frame = tk.Frame(main_content_frame, bg='#f0f0f0')
-    header_frame.grid(row=0, column=0, columnspan=5, sticky="ew", pady=(5, 10))
-
-    tk.Label(
-        header_frame,
-        text="WorldEdit Schematic Generator",
-        font=("Arial", 16, "bold"),
-        bg='#f0f0f0',
-        fg='#333333'
-    ).pack(side="left")
-
-    tk.Button(
-        header_frame,
-        text="Schem → Command Blocks",
-        command=lambda: show_converter_page(scrollable_frame, main_content_frame, gui),
-        font=("Arial", 10, "bold"),
-        bg='#FF5722',
-        fg='#ffffff',
-        activebackground='#E64A19',
-        padx=10
-    ).pack(side="right", padx=5)
-
-    # ───────────────────────────────────────────────
-    #                   Main content
-    # ───────────────────────────────────────────────
-
-    # Block Type
-    tk.Label(main_content_frame, text="Block Type:", font=("Arial", 10), bg='#f0f0f0').grid(row=1, column=0, pady=2, sticky="w")
-    tk.Entry(main_content_frame, textvariable=gui.schematic_block, width=20, bg='#ffffff', font=("Arial", 10)).grid(row=1, column=1, pady=2, sticky="w")
-
-    # Dimensions
-    tk.Label(main_content_frame, text="Dimensions (Width, Height, Length):", font=("Arial", 12, "bold"), bg='#f0f0f0', fg='#333333').grid(row=2, column=0, columnspan=5, pady=(12, 2), sticky="w")
-
-    for i, (label_text, var) in enumerate([
-        ("Width:",  gui.schematic_width),
-        ("Height:", gui.schematic_height),
-        ("Length:", gui.schematic_length)
-    ]):
-        tk.Label(main_content_frame, text=label_text, font=("Arial", 10), bg='#f0f0f0').grid(row=i+3, column=0, pady=2, sticky="w")
-        tk.Entry(main_content_frame, textvariable=var, width=10, bg='#ffffff', font=("Arial", 10)).grid(row=i+3, column=1, pady=2, sticky="w")
-
-    # Origin Coordinates
-    tk.Label(main_content_frame, text="Origin (X, Y, Z):", font=("Arial", 12, "bold"), bg='#f0f0f0', fg='#333333').grid(row=6, column=0, columnspan=5, pady=(12, 2), sticky="w")
-
-    for i, (label_text, var) in enumerate([
-        ("X:", gui.schematic_x),
-        ("Y:", gui.schematic_y),
-        ("Z:", gui.schematic_z)
-    ]):
-        tk.Label(main_content_frame, text=label_text, font=("Arial", 10), bg='#f0f0f0').grid(row=i+7, column=0, pady=2, sticky="w")
-        tk.Entry(main_content_frame, textvariable=var, width=10, bg='#ffffff', font=("Arial", 10)).grid(row=i+7, column=1, pady=2, sticky="w")
-
-    # Command
-    tk.Label(main_content_frame, text="Command:", font=("Arial", 12, "bold"), bg='#f0f0f0', fg='#333333').grid(row=10, column=0, columnspan=5, pady=(12, 2), sticky="w")
-    tk.Entry(main_content_frame, textvariable=gui.schematic_command, width=40, bg='#ffffff', font=("Arial", 10)).grid(row=11, column=0, columnspan=3, pady=2, sticky="w")
-
-    # Generate button
-    tk.Button(
-        main_content_frame,
-        text="Generate and Save Schematic",
-        command=lambda: generate_schematic(gui),
-        font=("Arial", 11),
-        bg='#4CAF50',
-        fg='#ffffff',
-        activebackground='#43A047'
-    ).grid(row=12, column=0, columnspan=5, pady=20, sticky="w")
-
-    # View Schematic Button
-    def open_viewer_window():
-        file_path = filedialog.askopenfilename(
-            defaultextension=".schem",
-            filetypes=[("Schematic files", "*.schem"), ("All files", "*.*")]
-        )
-        if file_path:
-            threading.Thread(target=lambda: SchematicViewer(file_path).run(), daemon=True).start()
-            gui.print_to_text(f"Viewing schematic: {file_path}", "normal")
-
-    tk.Button(
-        main_content_frame,
-        text="View Schematic in 3D",
-        command=open_viewer_window,
-        font=("Arial", 11),
-        bg='#2196F3',
-        fg='#ffffff',
-        activebackground='#1E88E5'
-    ).grid(row=13, column=0, columnspan=5, pady=5, sticky="w")
-
-    # Extra spacing
-    tk.Label(main_content_frame, text="", bg='#f0f0f0').grid(row=14, column=0, pady=20)
-
-
-def show_converter_page(scrollable_frame, main_content_frame, gui):
-    main_content_frame.grid_remove()
-    converter_frame = create_converter_subframe(scrollable_frame, gui, lambda: hide_converter_page(scrollable_frame, main_content_frame))
+    # Directly load the converter (no old generator UI)
+    converter_frame = create_converter_subframe(scrollable_frame, gui, lambda: None)
     converter_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-
-
-def hide_converter_page(scrollable_frame, main_content_frame):
-    for child in scrollable_frame.winfo_children():
-        if child != main_content_frame:
-            child.destroy()
-    main_content_frame.grid()

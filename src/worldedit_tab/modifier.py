@@ -1,6 +1,7 @@
-# Created on 01:17 PM CDT, Monday, September 01, 2025
+# modifier.py
 import logging
 from .schematic_generator import generate_schematic_from_command
+
 
 def process_command(gui, command):
     """Process a command in the WorldEdit Schematic tab and generate a schematic."""
