@@ -29,27 +29,36 @@ class TimelineSchematicBuilder:
             self.physical_items.append(('cmd', str(cmd).strip()))
             prev_ticks = curr_ticks
 
-    def build_reference_layout(self, max_z_per_floor: int = 15, floor_height: int = 2):
+    def build_reference_layout(self, max_z_per_floor: int = 50, floor_height: int = 2):
         num_items = len(self.physical_items)
         num_floors = math.ceil(num_items / max_z_per_floor)
 
-        OAK_SLAB = "minecraft:oak_slab[type=top,waterlogged=false]"
-        STONE_SLAB = "minecraft:stone_slab[type=top,waterlogged=false]"
         QTZ = "minecraft:quartz_block"
-        WIRE = "minecraft:redstone_wire[east=none,north=side,power=0,south=side,west=none]"
         CMD = "minecraft:command_block[conditional=false,facing=up]"
 
         print(f"DEBUG: Building layout with {num_floors} floors and {num_items} items")
+
+        # Clear grid to prevent residual ghost layouts
+        self.grid = defaultdict(lambda: ("minecraft:air", None))
 
         item_idx = 0
         for floor_idx in range(num_floors):
             y_base = floor_idx * floor_height
 
-            # Main timeline
+            # Main timeline loop
             for pos in range(max_z_per_floor):
                 if item_idx >= num_items:
                     break
-                z = 2 + pos
+                
+                # Floor 0: blocks step backwards through Z space, so repeaters face SOUTH to push signal along
+                # Floor 1: blocks step forwards through Z space, so repeaters face NORTH to push signal along
+                if floor_idx % 2 == 0:
+                    z = 2 + (max_z_per_floor - 1 - pos)
+                    facing = "south"
+                else:
+                    z = 2 + pos
+                    facing = "north"
+                    
                 item = self.physical_items[item_idx]
 
                 self._set(0, y_base, z, QTZ)
@@ -58,32 +67,10 @@ class TimelineSchematicBuilder:
                     self._set(0, y_base + 1, z, CMD)
                     self._add_cmd_entity(0, y_base + 1, z, item[1])
                 else:
-                    facing = "south" if (floor_idx % 2 == 0) else "north"
                     rep = f"minecraft:repeater[delay={item[1]},facing={facing},locked=false,powered=false]"
                     self._set(0, y_base + 1, z, rep)
 
                 item_idx += 1
-
-            # === STRONG DEBUG TRANSITION ===
-            if floor_idx < num_floors - 1:
-                next_y = y_base + floor_height
-                end_z = 2 + max_z_per_floor
-
-                # Left side (beginning) - BIG oak slab tower so it's obvious
-                for dy in range(3):
-                    self._set(0, next_y + dy, 0, OAK_SLAB)
-                    self._set(0, next_y + dy, 1, OAK_SLAB)
-
-                # Right side (end) - BIG stone slab tower
-                for dy in range(4):
-                    self._set(0, next_y + dy, end_z + 1, STONE_SLAB)
-
-                self._set(0, next_y + 1, end_z + 2, WIRE)
-
-                # Only one quartz at corner
-                self._set(0, next_y, end_z, QTZ)
-
-        print("DEBUG: Transition code executed")
 
     def _set(self, x, y, z, block):
         self.grid[(x, y, z)] = (block, None)
@@ -100,7 +87,6 @@ class TimelineSchematicBuilder:
         self.grid[(x, y, z)] = (self.grid[(x, y, z)][0], entity)
 
     def to_schematic_data(self):
-        # (standard conversion - unchanged)
         if not self.grid:
             raise ValueError("Empty grid")
 
@@ -157,8 +143,8 @@ class TimelineSchematicBuilder:
             "BlockData": ByteArray(block_data),
             "BlockEntities": block_entities,
             "Metadata": Compound({
-                "WEOffsetX": Int(min_x),
-                "WEOffsetY": Int(min_y),
-                "WEOffsetZ": Int(min_z - 18),
+                "WEOffsetX": Int(0),
+                "WEOffsetY": Int(0),
+                "WEOffsetZ": Int(0),
             }),
         }
