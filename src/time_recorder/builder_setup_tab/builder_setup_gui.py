@@ -23,10 +23,13 @@ def create_builder_setup_gui(parent, app):
     ttk.Button(toolbar, text="📂 Load Project", command=app.load_project).pack(side="left", padx=5)
     ttk.Button(toolbar, text="🎵 Import Audio", command=lambda: load_audio_data(app)).pack(side="left", padx=5)
 
-    # Export Button (with layer length setting nearby)
-    ttk.Label(toolbar, text="Commands per Floor:").pack(side="left", padx=(10, 0))
+    # Export configuration layout entry selectors
+    ttk.Label(toolbar, text="Commands per Floor (Z):").pack(side="left", padx=(10, 0))
     app.layer_length_var = tk.StringVar(value="50")
     ttk.Entry(toolbar, textvariable=app.layer_length_var, width=5).pack(side="left", padx=5)
+
+    ttk.Label(toolbar, text="Max Tower Height (Y):").pack(side="left", padx=(5, 0))
+    ttk.Entry(toolbar, textvariable=app.height_limit_var, width=5).pack(side="left", padx=5)
 
     ttk.Button(
         toolbar, 

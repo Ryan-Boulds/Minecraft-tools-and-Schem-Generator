@@ -3,6 +3,7 @@ import math
 from collections import defaultdict
 from nbtlib.tag import Compound, List, Byte, Int, Short, ByteArray, String, IntArray
 
+
 class TimelineSchematicBuilder:
     def __init__(self, tick_rate: float = 20.0):
         self.tick_rate = tick_rate
@@ -29,29 +30,35 @@ class TimelineSchematicBuilder:
             self.physical_items.append(('cmd', str(cmd).strip()))
             prev_ticks = curr_ticks
 
-    def build_reference_layout(self, max_z_per_floor: int = 50, floor_height: int = 2):
+    def build_reference_layout(self, max_z_per_floor: int = 50, floor_height: int = 2, max_height: int = 50):
         num_items = len(self.physical_items)
         num_floors = math.ceil(num_items / max_z_per_floor)
+
+        floors_per_column = max(1, max_height // floor_height)
 
         QTZ = "minecraft:quartz_block"
         CMD = "minecraft:command_block[conditional=false,facing=up]"
 
-        print(f"DEBUG: Building layout with {num_floors} floors and {num_items} items")
+        print(f"DEBUG: Building layout with {num_floors} total segments...")
 
-        # Clear grid to prevent residual ghost layouts
         self.grid = defaultdict(lambda: ("minecraft:air", None))
 
         item_idx = 0
         for floor_idx in range(num_floors):
-            y_base = floor_idx * floor_height
+            column_idx = floor_idx // floors_per_column
+            floor_in_column = floor_idx % floors_per_column
 
-            # Main timeline loop
+            x = column_idx * 2
+
+            if column_idx % 2 == 0:
+                y_base = floor_in_column * floor_height
+            else:
+                y_base = (floors_per_column - 1 - floor_in_column) * floor_height
+
             for pos in range(max_z_per_floor):
                 if item_idx >= num_items:
                     break
                 
-                # Floor 0: blocks step backwards through Z space, so repeaters face SOUTH to push signal along
-                # Floor 1: blocks step forwards through Z space, so repeaters face NORTH to push signal along
                 if floor_idx % 2 == 0:
                     z = 2 + (max_z_per_floor - 1 - pos)
                     facing = "south"
@@ -61,14 +68,18 @@ class TimelineSchematicBuilder:
                     
                 item = self.physical_items[item_idx]
 
-                self._set(0, y_base, z, QTZ)
+                # ONLY place quartz DIRECTLY under the redstone component
+                y_support = y_base
+                y_component = y_base + 1
+
+                self._set(x, y_support, z, QTZ)   # Support block only here
 
                 if item[0] == 'cmd':
-                    self._set(0, y_base + 1, z, CMD)
-                    self._add_cmd_entity(0, y_base + 1, z, item[1])
+                    self._set(x, y_component, z, CMD)
+                    self._add_cmd_entity(x, y_component, z, item[1])
                 else:
                     rep = f"minecraft:repeater[delay={item[1]},facing={facing},locked=false,powered=false]"
-                    self._set(0, y_base + 1, z, rep)
+                    self._set(x, y_component, z, rep)
 
                 item_idx += 1
 
@@ -110,6 +121,15 @@ class TimelineSchematicBuilder:
                 palette.append(name)
             return pal_map[name]
 
+        # Reserve palette index 0 for air. block_data is a zero-initialized
+        # bytearray, so any voxel we never explicitly _set() (i.e. every gap
+        # in the bounding box, including the gap between the up-run and
+        # down-run) is already byte value 0. If air isn't guaranteed to be
+        # palette index 0, those unset voxels get interpreted as whatever
+        # block happened to be registered first in the palette (quartz),
+        # which is exactly why the gaps were rendering as quartz.
+        pid("minecraft:air")
+
         for (gx, gy, gz), (bname, ent) in self.grid.items():
             lx = gx - min_x
             ly = gy - min_y
@@ -148,3 +168,10 @@ class TimelineSchematicBuilder:
                 "WEOffsetZ": Int(0),
             }),
         }
+
+
+def create_schematic_data(events, tick_rate=20.0):
+    builder = TimelineSchematicBuilder(tick_rate)
+    builder.add_events(events)
+    builder.build_reference_layout()
+    return builder.to_schematic_data()

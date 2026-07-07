@@ -18,6 +18,7 @@ class TimeRecorderManager:
         self.sequences = []             
         self.next_sequence_id = 0
         self.tick_rate = tk.StringVar(value="20")
+        self.height_limit_var = tk.StringVar(value="50")  # Added vertical ceiling constraint variable
         
         # Internal State
         self.is_recording = False
@@ -119,6 +120,7 @@ class TimeRecorderManager:
         try:
             project_data = {
                 "tick_rate": self.tick_rate.get(),
+                "height_limit": self.height_limit_var.get(),
                 "mapped_commands": self.mapped_commands,
                 "sequences": [
                     {
@@ -150,6 +152,7 @@ class TimeRecorderManager:
                 data = json.load(f)
 
             self.tick_rate.set(data.get("tick_rate", "20"))
+            self.height_limit_var.set(data.get("height_limit", "50"))
             self.mapped_commands = data.get("mapped_commands", [])
 
             self.sequences = []

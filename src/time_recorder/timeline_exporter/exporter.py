@@ -15,17 +15,24 @@ def generate_timeline_schematic(app) -> str | None:
 
     tick_rate = float(app.tick_rate.get() or 20.0)
 
-    # Fetch custom layout length dynamically from your new UI entry box
     try:
         max_z = int(app.layer_length_var.get())
     except (ValueError, AttributeError):
-        max_z = 50  # Default fallback if the entry is empty or missing
+        max_z = 50
+
+    try:
+        max_y = int(app.height_limit_var.get())
+    except (ValueError, AttributeError):
+        max_y = 50
 
     builder = TimelineSchematicBuilder(tick_rate=tick_rate)
     builder.add_events(events)
     
-    # Pass the dynamic length value to the layout calculation engine
-    builder.build_reference_layout(max_z_per_floor=max_z, floor_height=2)
+    builder.build_reference_layout(
+        max_z_per_floor=max_z, 
+        floor_height=2, 
+        max_height=max_y
+    )
 
     schematic_nbt = builder.to_schematic_data()
 
