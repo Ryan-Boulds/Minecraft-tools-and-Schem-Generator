@@ -10,12 +10,15 @@ import keyboard
 from modify_laser_tab.modify_laser_gui import create_modify_laser_gui
 from set_coordinates_tab.set_coordinates_gui import create_set_coordinates_gui
 from change_block_tab.change_block_gui import create_change_block_gui
-from generate_laser_tab.generate_laser_gui import create_generate_laser_gui
 from generate_end_beam_tab.generate_end_beam_gui import create_generate_end_beam_gui
 from rename_tag_group_tab.rename_tag_group_gui import create_rename_tag_group_gui
 from settings_tab.settings_gui import create_settings_gui
 from worldedit_tab.worldedit_gui import create_worldedit_schematic_gui
 from modify_properties_tab.modify_properties_gui import create_modify_properties_gui
+
+# New: Laser Animations tab (replaces the old top-level generate_laser_tab /
+# generate_end_beam_tab imports below)
+from laser_animations.laser_tab_main import create_laser_animations_gui
 
 from time_recorder.time_recorder_main import TimeRecorderManager
 
@@ -108,11 +111,13 @@ class CommandModifierGUI:
 
         self.cmd_gen_frame = ttk.Frame(self.main_notebook)
         self.cmd_blocks_frame = ttk.Frame(self.main_notebook)
+        self.laser_animations_frame = ttk.Frame(self.main_notebook)
         self.time_recorder_frame = ttk.Frame(self.main_notebook)
         self.settings_frame = ttk.Frame(self.main_notebook)
 
         self.main_notebook.add(self.cmd_gen_frame, text="Command Generation")
         self.main_notebook.add(self.cmd_blocks_frame, text="Command Blocks")
+        self.main_notebook.add(self.laser_animations_frame, text="Laser Animations")
         self.main_notebook.add(self.time_recorder_frame, text="Time Recorder")
         self.main_notebook.add(self.settings_frame, text="Settings")
 
@@ -126,7 +131,6 @@ class CommandModifierGUI:
         self.set_coordinates_frame = ttk.Frame(self.cmd_gen_notebook)
         self.change_block_frame = ttk.Frame(self.cmd_gen_notebook)
         self.modify_properties_frame = ttk.Frame(self.cmd_gen_notebook)
-        self.generate_laser_frame = ttk.Frame(self.cmd_gen_notebook)
         self.generate_end_beam_frame = ttk.Frame(self.cmd_gen_notebook)
         self.rename_tag_group_frame = ttk.Frame(self.cmd_gen_notebook)
 
@@ -134,7 +138,6 @@ class CommandModifierGUI:
         self.cmd_gen_notebook.add(self.set_coordinates_frame, text="Set Coordinates")
         self.cmd_gen_notebook.add(self.change_block_frame, text="Change Block")
         self.cmd_gen_notebook.add(self.modify_properties_frame, text="Modify Properties")
-        self.cmd_gen_notebook.add(self.generate_laser_frame, text="Generate Laser")
         self.cmd_gen_notebook.add(self.generate_end_beam_frame, text="Generate End Beam")
         self.cmd_gen_notebook.add(self.rename_tag_group_frame, text="Rename Tag/Group")
 
@@ -142,7 +145,6 @@ class CommandModifierGUI:
         create_set_coordinates_gui(self.set_coordinates_frame, self)
         create_change_block_gui(self.change_block_frame, self)
         create_modify_properties_gui(self.modify_properties_frame, self)
-        create_generate_laser_gui(self.generate_laser_frame, self)
         create_generate_end_beam_gui(self.generate_end_beam_frame, self)
         create_rename_tag_group_gui(self.rename_tag_group_frame, self)
 
@@ -156,6 +158,8 @@ class CommandModifierGUI:
         self.cmd_blocks_notebook.add(self.worldedit_frame, text="Add WorldEdit Schematic")
         create_worldedit_schematic_gui(self.worldedit_frame, self)
 
+        # Laser Animations (Generate Laser / Animate / Duplicate-Mirror sub-tabs)
+        create_laser_animations_gui(self.laser_animations_frame, self)
 
         # Time Recorder (handled by manager)
         self.time_recorder_frame.columnconfigure(0, weight=1)
@@ -192,6 +196,9 @@ class CommandModifierGUI:
         elif main_text == "Command Blocks":
             sub_id = self.cmd_blocks_notebook.select()
             return self.cmd_blocks_notebook.tab(sub_id, "text") if sub_id else ""
+        elif main_text == "Laser Animations":
+            sub_id = self.laser_animations_notebook.select()
+            return self.laser_animations_notebook.tab(sub_id, "text") if sub_id else ""
         elif main_text == "Time Recorder":
             sub_id = self.time_recorder_notebook.select()
             return self.time_recorder_notebook.tab(sub_id, "text") if sub_id else "Time Recorder"
@@ -251,15 +258,15 @@ class CommandModifierGUI:
             logging.error(f"Error processing clipboard: {e}")
 
     def generate_laser(self):
-        from generate_laser_tab.modifier import generate_laser_commands
+        from laser_animations.generate_laser_tab.modifier import generate_laser_commands
         generate_laser_commands(self)
 
     def generate_kill_laser(self):
-        from generate_laser_tab.modifier import generate_kill_laser_command
+        from laser_animations.generate_laser_tab.modifier import generate_kill_laser_command
         generate_kill_laser_command(self)
 
     def copy_from_clipboard(self):
-        from generate_laser_tab.modifier import parse_clipboard_coordinates
+        from laser_animations.generate_laser_tab.modifier import parse_clipboard_coordinates
         parse_clipboard_coordinates(self)
 
     def generate_end_beam(self):
@@ -297,9 +304,6 @@ class CommandModifierGUI:
         elif current_tab == "Change Block":
             from change_block_tab.modifier import modify_clipboard_command
             return modify_clipboard_command(self)
-        elif current_tab == "Generate Laser":
-            from generate_laser_tab.modifier import generate_laser_commands
-            return generate_laser_commands(self)
         elif current_tab == "Generate End Beam":
             from generate_end_beam_tab.modifier import generate_end_beam_commands
             return generate_end_beam_commands(self)
@@ -312,6 +316,15 @@ class CommandModifierGUI:
         elif current_tab == "Modify Properties":
             from modify_properties_tab.modifier import modify_properties_command
             return modify_properties_command(self)
+        elif current_tab == "Generate Laser":
+            from laser_animations.generate_laser_tab.modifier import generate_laser_commands
+            return generate_laser_commands(self)
+        elif current_tab == "Animate":
+            from laser_animations.animator_tab.animator_tab_main import process_command
+            return process_command(self, command)
+        elif current_tab == "Duplicate/Mirror":
+            from laser_animations.duplicate_mirror_laser.duplicate_mirror_laser_main import process_command
+            return process_command(self, command)
 
 
 if __name__ == "__main__":
