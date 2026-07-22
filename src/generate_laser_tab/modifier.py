@@ -14,25 +14,30 @@ def generate_laser_commands(gui):
 
         # Direction-specific offsets and transformations
         if direction == "North":
-            x, y, z = base_x - 0.08, base_y + 0.42, base_z - 0.01
-            translation = "[0.5f,0.0f,0f]"
-            scale = "[0.1f,0.1f,-150f]"
-        elif direction == "South":
-            x, y, z = base_x - 0.02, base_y + 0.42, base_z + 1.01
-            translation = "[0.5f,0.0f,0f]"
+            x, y, z = base_x, base_y + 0.42, base_z - 0.01
+            translation = "[0.075f,0.0f,0f]"
             scale = "[0.1f,0.1f,150f]"
+            left_rotation = "[0f,1f,0f,0f]"
+        elif direction == "South":
+            x, y, z = base_x, base_y + 0.42, base_z + 1.01
+            translation = "[-0.025f,0.06f,0f]"
+            scale = "[0.1f,0.1f,150f]"
+            left_rotation = "[0f,0f,0f,1f]"
         elif direction == "East":
-            x, y, z = base_x, base_y + 0.42, base_z + 0.42
-            translation = "[0.5f,0.0f,0f]"
+            x, y, z = base_x + 1.01, base_y + 0.42, base_z + 0.42
+            translation = "[0f,0.0f,0f]"
             scale = "[150f,0.1f,0.1f]"
+            left_rotation = "[0f,0f,0f,1f]"
         elif direction == "West":
-            x, y, z = base_x - 1.0, base_y + 0.42, base_z + 0.48
-            translation = "[0.5f,0.0f,0f]"
-            scale = "[-150f,0.1f,0.1f]"
+            x, y, z = base_x - 0.01, base_y + 0.42, base_z
+            translation = "[0f,0.0f,0.08f]"
+            scale = "[150f,0.1f,0.1f]"
+            left_rotation = "[0f,1f,0f,0f]"
         else:
-            x, y, z = base_x - 0.08, base_y + 0.42, base_z - 0.01
-            translation = "[0.5f,0.0f,0f]"
-            scale = "[0.1f,0.1f,-150f]"
+            x, y, z = base_x, base_y + 0.42, base_z - 0.01
+            translation = "[0.075f,0.0f,0f]"
+            scale = "[0.1f,0.1f,150f]"
+            left_rotation = "[0f,1f,0f,0f]"
 
         def clean(num):
             if abs(num - int(num)) < 1e-6:
@@ -44,7 +49,7 @@ def generate_laser_commands(gui):
             f"{{block_state:{{Name:\"{block}\"}},"
             f"transformation:{{translation:{translation},"
             f"scale:{scale},"
-            f"left_rotation:[0f,0f,0f,1f],"
+            f"left_rotation:{left_rotation},"
             f"right_rotation:[0f,0f,0f,1f]}},"
             f"brightness:15728880,shadow:false,billboard:\"fixed\",Tags:[\"{tag}\"]}}"
         )
