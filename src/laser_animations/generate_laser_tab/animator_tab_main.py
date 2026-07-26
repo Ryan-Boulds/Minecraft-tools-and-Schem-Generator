@@ -2,14 +2,12 @@
 """
 Builds the 'Animate' sub-tab under Laser Animations.
 
-This tab does NOT spawn lasers - it steers ones that are already spawned
-in-game (each possibly at a different starting angle). Given a parametric
-path (x(t), y(t), z(t)) - with the laser's origin treated as (0, 0, 0) -
-it generates a sequence of relative rotation commands
-(`execute as @e[tag=...] at @s run tp @s ~ ~ ~ <yaw> <pitch>`) that sweep
-the laser along that path, timed against a chosen total duration and tick
-rate, and exports the whole sequence as a WorldEdit .schem using the
-existing TimelineSchematicBuilder.
+Lets the user describe a parametric path (x(t), y(t), z(t)) - with the
+laser's origin fixed at (0, 0, 0) - then generates a sequence of relative
+rotation commands (`execute as @e[tag=...] at @s run tp @s ~ ~ ~ <yaw>
+<pitch>`) that sweep the laser along that path, timed against a chosen
+total duration and tick rate, and exports the whole sequence as a
+WorldEdit .schem using the existing TimelineSchematicBuilder.
 
 Public interface (unchanged from the placeholder, since laser_tab_main.py
 imports these by name):
@@ -21,18 +19,9 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from .equation_parser import EquationParseError
-from .path_generator import build_rotation_events, compute_step_count, sample_curve, PathGenerationError
+from .path_generator import build_rotation_events, PathGenerationError
 from .schem_export import export_animation_schematic
 from .animator_preview import PathPreview
-
-# Default equation per starting compass direction. In Minecraft, North is
-# -Z, South is +Z, East is +X, West is -X.
-DEFAULT_EQUATIONS = {
-    "North": "(10cos(t), -10, 10sin(t))",
-    "South": "(10cos(t), 10, 10sin(t))",
-    "East": "(10, 10cos(t), 10sin(t))",
-    "West": "(-10, 10cos(t), 10sin(t))",
-}
 
 
 def create_animator_gui(parent_frame, app):
@@ -50,42 +39,26 @@ def create_animator_gui(parent_frame, app):
     tk.Label(
         parent_frame,
         text=(
-            "Steers lasers that are already spawned in-game (no /summon here).\n"
-            "The path's origin is treated as (0, 0, 0) regardless of the laser's\n"
-            "real in-game coordinates. Every generated command is a relative\n"
-            "rotation, so it works no matter what angle each laser is currently at -\n"
-            "just make sure it's aimed at the path's starting point first."
+            "Describe the path as (x(t), y(t), z(t)) - e.g. (10, 10cos(t), 10sin(t)).\n"
+            "The laser's origin is treated as (0, 0, 0) for this path; it is NOT\n"
+            "translated to the base laser position below (that position is only\n"
+            "used to summon the laser)."
         ),
         font=("Segoe UI", 9), justify="left", fg="#555555",
     ).grid(row=1, column=0, columnspan=2, sticky="w", padx=10, pady=(0, 10))
 
-    # ---- Direction (sets the default equation) ----
-    dir_frame = ttk.Frame(parent_frame)
-    dir_frame.grid(row=2, column=0, columnspan=2, sticky="w", padx=10, pady=2)
-    tk.Label(dir_frame, text="Starting direction:", font=("Segoe UI", 10)).grid(row=0, column=0, sticky="w")
-    app.animator_direction_var = tk.StringVar(value="East")
-    direction_combo = ttk.Combobox(
-        dir_frame, textvariable=app.animator_direction_var,
-        values=["North", "South", "East", "West"], state="readonly", width=10,
-    )
-    direction_combo.grid(row=0, column=1, padx=(2, 0))
-    direction_combo.bind(
-        "<<ComboboxSelected>>",
-        lambda e: app.animator_equation_var.set(DEFAULT_EQUATIONS[app.animator_direction_var.get()]),
-    )
-
     # ---- Equation ----
     tk.Label(parent_frame, text="Path (x(t), y(t), z(t)):", font=("Segoe UI", 10, "bold")).grid(
-        row=3, column=0, sticky="w", padx=10, pady=2
+        row=2, column=0, sticky="w", padx=10, pady=2
     )
-    app.animator_equation_var = tk.StringVar(value=DEFAULT_EQUATIONS[app.animator_direction_var.get()])
+    app.animator_equation_var = tk.StringVar(value="(10, 10cos(t), 10sin(t))")
     tk.Entry(parent_frame, textvariable=app.animator_equation_var, width=40).grid(
-        row=3, column=1, sticky="we", padx=10, pady=2
+        row=2, column=1, sticky="we", padx=10, pady=2
     )
 
     # ---- t range ----
     t_frame = ttk.Frame(parent_frame)
-    t_frame.grid(row=4, column=0, columnspan=2, sticky="w", padx=10, pady=2)
+    t_frame.grid(row=3, column=0, columnspan=2, sticky="w", padx=10, pady=2)
     tk.Label(t_frame, text="t start:", font=("Segoe UI", 10)).grid(row=0, column=0, sticky="w")
     app.animator_t_start_var = tk.StringVar(value="0")
     tk.Entry(t_frame, textvariable=app.animator_t_start_var, width=10).grid(row=0, column=1, padx=(2, 15))
@@ -93,16 +66,9 @@ def create_animator_gui(parent_frame, app):
     app.animator_t_end_var = tk.StringVar(value="pi/2")
     tk.Entry(t_frame, textvariable=app.animator_t_end_var, width=10).grid(row=0, column=3, padx=(2, 0))
 
-    # ---- Tag ----
-    tag_frame = ttk.Frame(parent_frame)
-    tag_frame.grid(row=5, column=0, columnspan=2, sticky="w", padx=10, pady=2)
-    tk.Label(tag_frame, text="Tag:", font=("Segoe UI", 10)).grid(row=0, column=0, sticky="w")
-    app.animator_tag_var = tk.StringVar(value="beam1")
-    tk.Entry(tag_frame, textvariable=app.animator_tag_var, width=15).grid(row=0, column=1, padx=(2, 0))
-
     # ---- Timing ----
     timing_frame = ttk.Frame(parent_frame)
-    timing_frame.grid(row=6, column=0, columnspan=2, sticky="w", padx=10, pady=2)
+    timing_frame.grid(row=4, column=0, columnspan=2, sticky="w", padx=10, pady=2)
     tk.Label(timing_frame, text="Total time (ms):", font=("Segoe UI", 10)).grid(row=0, column=0, sticky="w")
     app.animator_time_ms_var = tk.StringVar(value="2000")
     tk.Entry(timing_frame, textvariable=app.animator_time_ms_var, width=10).grid(row=0, column=1, padx=(2, 15))
@@ -112,7 +78,7 @@ def create_animator_gui(parent_frame, app):
 
     # ---- Layout options (schem sizing, same meaning as the general exporter) ----
     layout_frame = ttk.Frame(parent_frame)
-    layout_frame.grid(row=7, column=0, columnspan=2, sticky="w", padx=10, pady=2)
+    layout_frame.grid(row=5, column=0, columnspan=2, sticky="w", padx=10, pady=2)
     tk.Label(layout_frame, text="Layer length:", font=("Segoe UI", 10)).grid(row=0, column=0, sticky="w")
     app.animator_layer_length_var = tk.StringVar(value="50")
     tk.Entry(layout_frame, textvariable=app.animator_layer_length_var, width=10).grid(row=0, column=1, padx=(2, 15))
@@ -120,9 +86,16 @@ def create_animator_gui(parent_frame, app):
     app.animator_height_limit_var = tk.StringVar(value="50")
     tk.Entry(layout_frame, textvariable=app.animator_height_limit_var, width=10).grid(row=0, column=3, padx=(2, 0))
 
+    # ---- Base laser note (reuses the Generate Laser tab's shared vars) ----
+    tk.Label(
+        parent_frame,
+        text="Uses the base position / block / tag / direction from the Generate Laser tab.",
+        font=("Segoe UI", 9), fg="#555555",
+    ).grid(row=6, column=0, columnspan=2, sticky="w", padx=10, pady=(4, 8))
+
     # ---- Buttons ----
     button_frame = ttk.Frame(parent_frame)
-    button_frame.grid(row=8, column=0, columnspan=2, sticky="w", padx=10, pady=4)
+    button_frame.grid(row=7, column=0, columnspan=2, sticky="w", padx=10, pady=4)
 
     tk.Button(
         button_frame, text="Preview Path", command=lambda: _preview_path(app),
@@ -141,12 +114,12 @@ def create_animator_gui(parent_frame, app):
 
     # ---- Output ----
     app.animator_output_text = tk.Text(parent_frame, height=14, width=70)
-    app.animator_output_text.grid(row=9, column=0, columnspan=2, sticky="nsew", padx=10, pady=(4, 10))
-    parent_frame.rowconfigure(9, weight=1)
+    app.animator_output_text.grid(row=8, column=0, columnspan=2, sticky="nsew", padx=10, pady=(4, 10))
+    parent_frame.rowconfigure(8, weight=1)
 
     app.animator_status_var = tk.StringVar(value="")
     tk.Label(parent_frame, textvariable=app.animator_status_var, font=("Segoe UI", 9), fg="#555555").grid(
-        row=10, column=0, columnspan=2, sticky="w", padx=10, pady=(0, 10)
+        row=9, column=0, columnspan=2, sticky="w", padx=10, pady=(0, 10)
     )
 
 
@@ -169,7 +142,13 @@ def _collect_inputs(app):
     total_time_ms = _get_float(app.animator_time_ms_var, "Total time (ms)")
     layer_length = _get_int(app.animator_layer_length_var, "Layer length")
     height_limit = _get_int(app.animator_height_limit_var, "Height limit")
-    tag = app.animator_tag_var.get() or "beam1"
+
+    base_x = _get_float(app.laser_x, "Base X")
+    base_y = _get_float(app.laser_y, "Base Y")
+    base_z = _get_float(app.laser_z, "Base Z")
+    block = app.laser_block.get() or "minecraft:lime_concrete"
+    tag = app.laser_tag.get() or "beam1"
+    direction = app.laser_direction.get() if hasattr(app, "laser_direction") else "North"
 
     return dict(
         equation_text=app.animator_equation_var.get(),
@@ -177,9 +156,10 @@ def _collect_inputs(app):
         t_end_text=app.animator_t_end_var.get(),
         total_time_ms=total_time_ms,
         tick_rate=tick_rate,
-        tag=tag,
-        layer_length=layer_length,
-        height_limit=height_limit,
+        direction=direction,
+        base_x=base_x, base_y=base_y, base_z=base_z,
+        block=block, tag=tag,
+        layer_length=layer_length, height_limit=height_limit,
     )
 
 
@@ -210,24 +190,26 @@ def _generate_events(app):
 
 def _preview_path(app):
     try:
-        tick_rate = _get_float(app.animator_tick_rate_var, "Tick rate")
-        total_time_ms = _get_float(app.animator_time_ms_var, "Total time (ms)")
-        step_count = compute_step_count(tick_rate, total_time_ms)
-        points = sample_curve(
-            app.animator_equation_var.get(),
-            app.animator_t_start_var.get(),
-            app.animator_t_end_var.get(),
-            step_count,
-        )
-    except (EquationParseError, PathGenerationError) as e:
-        messagebox.showerror("Invalid Input", str(e))
+        from .equation_parser import parse_vector_equation, parse_scalar
+        (x_fn, y_fn, z_fn), _exprs = parse_vector_equation(app.animator_equation_var.get())
+        t_start = parse_scalar(app.animator_t_start_var.get())
+        t_end = parse_scalar(app.animator_t_end_var.get())
+    except EquationParseError as e:
+        messagebox.showerror("Invalid Equation", str(e))
         return
+
+    try:
+        steps = 200
+        points = []
+        for i in range(steps + 1):
+            t = t_start + (t_end - t_start) * i / steps
+            points.append((x_fn(t), y_fn(t), z_fn(t)))
     except Exception as e:
         messagebox.showerror("Evaluation Error", str(e))
         return
 
     try:
-        PathPreview.show(points, total_time_ms=total_time_ms)
+        PathPreview.show(points)
     except ImportError:
         messagebox.showinfo(
             "Preview Unavailable",
