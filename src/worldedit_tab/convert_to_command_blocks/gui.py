@@ -1,20 +1,18 @@
-# src/worldedit_tab/command_block_generator/gui.py
+# worldedit_tab/convert_to_command_blocks/gui.py
 
 import tkinter as tk
 from tkinter import ttk, filedialog
-import nbtlib
-import gzip
 
-from .loader import load_schematic
+from ..common.schem_io import load_schematic, save_schematic
 from .converter import (
     generate_block_list,
     convert_to_command_blocks,
     convert_to_command_block_wall,
-    convert_to_command_block_wall_projected   # ← NEW
+    convert_to_command_block_wall_projected,
 )
 
 
-def create_converter_subframe(parent, gui, back_callback):
+def create_converter_subframe(parent, gui):
     frame = tk.Frame(parent, bg='#f0f0f0')
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(4, weight=1)
@@ -23,10 +21,7 @@ def create_converter_subframe(parent, gui, back_callback):
     header = tk.Frame(frame, bg='#f0f0f0')
     header.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(8, 12))
 
-    tk.Button(header, text="← Back", command=back_callback, font=("Arial", 11, "bold"),
-              bg="#555555", fg="white", activebackground="#444444", width=8).pack(side="left", padx=10)
-
-    tk.Label(header, text="Schematic → Command Blocks Converter",
+    tk.Label(header, text="Schematic \u2192 Command Blocks Converter",
              font=("Arial", 14, "bold"), bg='#f0f0f0').pack(side="left", padx=20)
 
     # File selection
@@ -94,7 +89,6 @@ def create_converter_subframe(parent, gui, back_callback):
     tk.Button(btn_frame, text="Generate Command Block WALL", command=generate_wall,
               bg='#673AB7', fg='white', width=26).pack(side="left", padx=6)
 
-    # NEW BUTTON
     tk.Button(btn_frame, text="Generate PROJECTED Wall", command=generate_projected,
               bg='#9C27B0', fg='white', width=26).pack(side="left", padx=6)
 
@@ -112,6 +106,9 @@ def _run_generator(text_widget, file_var, px_var, py_var, pz_var, ww_var, facing
     if not debug["success"]:
         text_widget.insert("end", f"Failed to load schematic: {debug['error']}\n")
         return
+    if debug["wrapped"] is False:
+        text_widget.insert("end", "Note: this file is missing the standard 'Schematic' NBT wrapper "
+                                   "(likely made by an old version of this app). Loaded it anyway.\n\n")
 
     try:
         px = float(px_var.get())
@@ -140,6 +137,9 @@ def _run_generator(text_widget, file_var, px_var, py_var, pz_var, ww_var, facing
         new_root = convert_to_command_block_wall(data, (px, py, pz), wall_width, facing)
     elif mode == "projected":
         new_root = convert_to_command_block_wall_projected(data, (px, py, pz), facing)
+    else:
+        text_widget.insert("end", f"Unknown mode: {mode}\n")
+        return
 
     out_path = filedialog.asksaveasfilename(
         defaultextension=".schem",
@@ -151,10 +151,7 @@ def _run_generator(text_widget, file_var, px_var, py_var, pz_var, ww_var, facing
         return
 
     try:
-        schem_file = nbtlib.File(new_root)
-        with open(out_path, 'wb') as f:
-            with gzip.GzipFile(fileobj=f, mode='wb') as gz:
-                schem_file.write(gz)
+        save_schematic(new_root, out_path)
         text_widget.insert("end", f"Successfully saved:\n{out_path}\n")
     except Exception as e:
         text_widget.insert("end", f"Error saving file: {e}\n")

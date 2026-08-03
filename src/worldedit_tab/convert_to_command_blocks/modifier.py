@@ -1,4 +1,4 @@
-# modifier.py
+# worldedit_tab/convert_to_command_blocks/modifier.py
 import logging
 from .schematic_generator import generate_schematic_from_command
 

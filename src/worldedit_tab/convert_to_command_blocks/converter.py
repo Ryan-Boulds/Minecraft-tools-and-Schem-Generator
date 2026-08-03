@@ -1,15 +1,12 @@
+# worldedit_tab/convert_to_command_blocks/converter.py
 import math
 from collections import defaultdict
-from nbtlib.tag import (
-    Compound, List, Byte, Int, Long,
-    Short, ByteArray, String, IntArray
-)
+
+from nbtlib.tag import Compound, Int, Short, ByteArray, IntArray, List
+
+from ..common.schem_io import command_block_state, make_command_block_entity
 
 AIR_BLOCK = "minecraft:air"
-
-
-def command_block_state(facing: str):
-    return f"minecraft:command_block[conditional=false,facing={facing}]"
 
 
 # === UNCHANGED FUNCTIONS ===
@@ -75,21 +72,7 @@ def convert_to_command_blocks(data, player_pos: tuple[float, float, float]) -> C
                 abs_z = pz + int(offset[2]) + hz
 
                 cmd = f"setblock {abs_x} {abs_y} {abs_z} {block}"
-
-                be = Compound({
-                    "id": String("minecraft:command_block"),
-                    "Pos": IntArray([hx, hy, hz]),
-                    "Command": String(cmd),
-                    "auto": Byte(0),
-                    "conditionMet": Byte(0),
-                    "powered": Byte(0),
-                    "TrackOutput": Byte(1),
-                    "SuccessCount": Int(0),
-                    "UpdateLastExecution": Byte(1),
-                    "LastExecution": Long(0),
-                    "LastOutput": String("")
-                })
-                new_block_entities.append(be)
+                new_block_entities.append(make_command_block_entity((hx, hy, hz), cmd))
 
     new_data = Compound({
         "Version": data["Version"],
@@ -177,21 +160,7 @@ def convert_to_command_block_wall(data, player_pos, wall_width: int, facing: str
         new_block_data[flat_idx] = 0
 
         cmd = f"setblock {abs_x} {abs_y} {abs_z} {block_type}"
-
-        be = Compound({
-            "id": String("minecraft:command_block"),
-            "Pos": IntArray([wx, wy, wz]),
-            "Command": String(cmd),
-            "auto": Byte(0),
-            "conditionMet": Byte(0),
-            "powered": Byte(0),
-            "TrackOutput": Byte(1),
-            "SuccessCount": Int(0),
-            "UpdateLastExecution": Byte(1),
-            "LastExecution": Long(0),
-            "LastOutput": String("")
-        })
-        new_block_entities.append(be)
+        new_block_entities.append(make_command_block_entity((wx, wy, wz), cmd))
 
     if facing == "east":
         offset_x, offset_z = 1, 0
@@ -225,9 +194,8 @@ def convert_to_command_block_wall(data, player_pos, wall_width: int, facing: str
     return new_data
 
 
-
 # ─────────────────────────────────────────────────────────────
-# PROJECTED WALL — CONSISTENT & FIXED 
+# PROJECTED WALL — CONSISTENT & FIXED
 # ─────────────────────────────────────────────────────────────
 
 def convert_to_command_block_wall_projected(
@@ -340,22 +308,7 @@ def convert_to_command_block_wall_projected(
             abs_z = pz + int(offset[2]) + orig_z
 
             cmd = f"setblock {abs_x} {abs_y} {abs_z} {block_type}"
-
-            be = Compound({
-                "id": String("minecraft:command_block"),
-                "Pos": IntArray([wx, wy, wz]),
-                "Command": String(cmd),
-                "auto": Byte(0),
-                "conditionMet": Byte(0),
-                "powered": Byte(0),
-                "TrackOutput": Byte(1),
-                "SuccessCount": Int(0),
-                "UpdateLastExecution": Byte(1),
-                "LastExecution": Long(0),
-                "LastOutput": String("")
-            })
-
-            new_block_entities.append(be)
+            new_block_entities.append(make_command_block_entity((wx, wy, wz), cmd))
 
     # ------------------------------------------
     # Correct offsets (same as normal wall)

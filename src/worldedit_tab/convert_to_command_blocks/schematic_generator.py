@@ -1,11 +1,10 @@
-# Updated origin handling — FIXED PASTE OFFSET
-# Updated February 28, 2026
-
+# worldedit_tab/convert_to_command_blocks/schematic_generator.py
 import logging
-import nbtlib
-from nbtlib.tag import Compound, List, Byte, Int, Long, Short, ByteArray, String, IntArray
 from tkinter import filedialog
-import gzip
+
+from nbtlib.tag import Compound, List, Int, Short, ByteArray, IntArray
+
+from ..common.schem_io import save_schematic, make_command_block_entity
 
 
 def generate_schematic(gui):
@@ -17,11 +16,6 @@ def generate_schematic(gui):
         width = int(gui.schematic_width.get()) if gui.schematic_width.get() else 1
         height = int(gui.schematic_height.get()) if gui.schematic_height.get() else 1
         length = int(gui.schematic_length.get()) if gui.schematic_length.get() else 1
-
-        # These are ONLY for command text — not structure placement
-        player_x = int(float(gui.schematic_x.get() or "0"))
-        player_y = int(float(gui.schematic_y.get() or "0"))
-        player_z = int(float(gui.schematic_z.get() or "0"))
 
         command = gui.schematic_command.get() or "say Hello from command block"
 
@@ -45,25 +39,12 @@ def generate_schematic(gui):
                 for pz in range(length):
                     for px in range(width):
                         block_entities.append(
-                            Compound({
-                                "id": String("minecraft:command_block"),
-                                "Pos": IntArray([px, py, pz]),
-                                "Command": String(command),
-                                "CustomName": String("{\"text\":\"@\"}"),
-                                "auto": Byte(0),
-                                "conditionMet": Byte(0),
-                                "powered": Byte(0),
-                                "TrackOutput": Byte(1),
-                                "SuccessCount": Int(0),
-                                "UpdateLastExecution": Byte(1),
-                                "LastExecution": Long(0),
-                                "LastOutput": String("")
-                            })
+                            make_command_block_entity((px, py, pz), command, custom_name="{\"text\":\"@\"}")
                         )
 
         schematic_data = Compound({
             "Version": Int(2),
-            "DataVersion": Int(4550),
+            "DataVersion": Int(3578),
             "Width": Short(width),
             "Height": Short(height),
             "Length": Short(length),
@@ -71,10 +52,7 @@ def generate_schematic(gui):
             "Palette": palette,
             "BlockData": block_data,
             "BlockEntities": block_entities,
-
-            # 🔥 CRITICAL FIX — ORIGIN IS ALWAYS ZERO
             "Offset": IntArray([0, 0, 0]),
-
             "Metadata": Compound({
                 "WEOffsetX": Int(0),
                 "WEOffsetY": Int(0),
@@ -82,18 +60,13 @@ def generate_schematic(gui):
             })
         })
 
-        schematic = nbtlib.File(schematic_data)
-
         file_path = filedialog.asksaveasfilename(
             defaultextension=".schem",
             filetypes=[("Schematic files", "*.schem"), ("All files", "*.*")]
         )
 
         if file_path:
-            with open(file_path, 'wb') as f:
-                with gzip.GzipFile(fileobj=f, mode='wb') as gz:
-                    schematic.write(gz)
-
+            save_schematic(schematic_data, file_path)
             gui.print_to_text(f"Schematic saved to {file_path}", "normal")
             logging.debug(f"Schematic saved to {file_path}")
             return file_path
