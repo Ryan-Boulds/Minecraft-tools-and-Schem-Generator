@@ -7,6 +7,7 @@ from tkinter import filedialog, messagebox
 
 from .scanner import scan_folder, scan_specific_files, collect_png_paths, save_palette, load_palette
 from ..common.recent_paths import get_dir, remember
+from .review_window import open_review_window
 
 
 def create_resource_pack_scanner_subframe(parent, gui):
@@ -14,7 +15,7 @@ def create_resource_pack_scanner_subframe(parent, gui):
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(6, weight=1)
 
-    state = {"palette": {}, "scanning": False}
+    state = {"palette": {}, "sources": {}, "scanning": False}
 
     header = tk.Frame(frame, bg='#f0f0f0')
     header.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(8, 12))
@@ -95,21 +96,22 @@ def create_resource_pack_scanner_subframe(parent, gui):
 
         def worker():
             try:
-                palette, stats = scan_folder(folder, progress_callback=progress,
-                                              color_mode=color_mode_var.get())
+                palette, stats, sources = scan_folder(folder, progress_callback=progress,
+                                                        color_mode=color_mode_var.get())
             except Exception as e:
                 text_list.after(0, lambda: _on_error(str(e)))
                 return
-            text_list.after(0, lambda: _on_scan_done(palette, stats))
+            text_list.after(0, lambda: _on_scan_done(palette, stats, sources))
 
         def _on_error(msg):
             state["scanning"] = False
             status_var.set("Scan failed.")
             text_list.insert("end", f"Error scanning folder: {msg}\n")
 
-        def _on_scan_done(palette, stats):
+        def _on_scan_done(palette, stats, sources):
             state["scanning"] = False
             state["palette"] = palette  # replaces -- this is the "start fresh from a pack" action
+            state["sources"] = sources
             status_var.set(
                 f"Done ({color_mode_var.get()} color). {stats['scanned']} block colors kept, "
                 f"{stats['not_a_block']} skipped (not a valid full-cube block), "
@@ -137,23 +139,24 @@ def create_resource_pack_scanner_subframe(parent, gui):
 
         def worker():
             try:
-                palette, stats = scan_specific_files(
+                palette, stats, sources = scan_specific_files(
                     paths, progress_callback=progress, color_mode=color_mode_var.get(),
                 )
             except Exception as e:
                 text_list.after(0, lambda: _on_error(str(e)))
                 return
-            text_list.after(0, lambda: _on_add_done(palette, stats, source_label))
+            text_list.after(0, lambda: _on_add_done(palette, stats, sources, source_label))
 
         def _on_error(msg):
             state["scanning"] = False
             status_var.set("Add failed.")
             messagebox.showerror("Add failed", msg)
 
-        def _on_add_done(palette, stats, label):
+        def _on_add_done(palette, stats, sources, label):
             state["scanning"] = False
             added = len(palette)
             state["palette"].update(palette)  # merge, don't replace
+            state["sources"].update(sources)
             status_var.set(
                 f"Added {added} block color(s) from {label} "
                 f"({stats['not_a_block']} rejected -- not a real full-cube block, or barrier/light/"
@@ -220,11 +223,18 @@ def create_resource_pack_scanner_subframe(parent, gui):
         try:
             palette = load_palette(in_path)
             state["palette"] = palette
+            state["sources"] = {}  # unknown -- loaded from JSON, not a live scan
             remember("palette_json", in_path)
             _refresh_preview()
             status_var.set(f"Loaded {len(palette)} colors from {in_path}")
         except Exception as e:
             messagebox.showerror("Load failed", str(e))
+
+    def review_palette():
+        if not state["palette"]:
+            messagebox.showinfo("Nothing to review", "Run a scan or add some textures first.")
+            return
+        open_review_window(frame, state, status_var, _refresh_preview, on_top_of=frame.winfo_toplevel())
 
     # Buttons
     btn_frame = tk.Frame(frame, bg='#f0f0f0')
@@ -232,6 +242,8 @@ def create_resource_pack_scanner_subframe(parent, gui):
 
     tk.Button(btn_frame, text="Scan Folder (replaces palette)", command=start_scan,
               bg='#4CAF50', fg='white', width=26).pack(side="left", padx=6)
+    tk.Button(btn_frame, text="Review / Edit Palette...", command=review_palette,
+              bg='#3F51B5', fg='white', width=22).pack(side="left", padx=6)
     tk.Button(btn_frame, text="Save Palette JSON", command=save_current,
               bg='#FF9800', fg='white', width=20).pack(side="left", padx=6)
     tk.Button(btn_frame, text="Load Existing Palette", command=load_existing,

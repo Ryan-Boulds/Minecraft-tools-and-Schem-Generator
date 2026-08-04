@@ -232,15 +232,21 @@ def is_emissive_texture(path: str) -> bool:
 
 
 def _scan_paths(png_paths, progress_callback=None, color_mode: str = "dominant"):
-    """Shared core: given a list of .png paths, return (palette, stats).
-    Used by both scan_folder() (which builds the path list by walking a
-    folder) and scan_specific_files() (an explicit, caller-supplied list --
-    a custom/curated folder or an individual multi-file selection).
-    Always requires a full-cube, non-blacklisted block -- see the module
-    docstring."""
+    """Shared core: given a list of .png paths, return (palette, stats,
+    sources). Used by both scan_folder() (which builds the path list by
+    walking a folder) and scan_specific_files() (an explicit, caller-
+    supplied list -- a custom/curated folder or an individual multi-file
+    selection). Always requires a full-cube, non-blacklisted block -- see
+    the module docstring.
+
+    `sources` maps each palette key back to the source file path it came
+    from ({"minecraft:name": "/path/to/name.png"}), so callers that want
+    to show the actual texture image (e.g. a review/edit window) can find
+    it without re-walking the filesystem."""
     color_fn = _dominant_rgb if color_mode == "dominant" else _average_rgb
 
     palette = {}
+    sources = {}
     scanned = 0
     skipped = 0
     not_a_block = 0
@@ -267,7 +273,9 @@ def _scan_paths(png_paths, progress_callback=None, color_mode: str = "dominant")
         if rgb is None:
             skipped += 1
         else:
-            palette[f"minecraft:{name}"] = list(rgb)
+            key = f"minecraft:{name}"
+            palette[key] = list(rgb)
+            sources[key] = path
             scanned += 1
 
         if progress_callback:
@@ -275,7 +283,7 @@ def _scan_paths(png_paths, progress_callback=None, color_mode: str = "dominant")
 
     stats = {"scanned": scanned, "skipped": skipped, "not_a_block": not_a_block,
               "emissive_skipped": emissive_skipped, "total_found": total}
-    return palette, stats
+    return palette, stats, sources
 
 
 def collect_png_paths(folder_path: str):
@@ -290,8 +298,8 @@ def collect_png_paths(folder_path: str):
 
 def scan_folder(folder_path: str, progress_callback=None, color_mode: str = "dominant"):
     """Walk `folder_path` recursively for .png textures and return
-    (palette, stats). Auto-discover entry point for a whole resource
-    pack. Always filtered to full-cube, non-blacklisted blocks."""
+    (palette, stats, sources). Auto-discover entry point for a whole
+    resource pack. Always filtered to full-cube, non-blacklisted blocks."""
     return _scan_paths(collect_png_paths(folder_path), progress_callback=progress_callback,
                         color_mode=color_mode)
 
@@ -301,7 +309,8 @@ def scan_specific_files(paths, progress_callback=None, color_mode: str = "domina
     (e.g. a hand-picked set of 20 textures) or an individual multi-file
     selection, rather than an auto-discovered whole resource pack. Same
     filtering as scan_folder() -- full-cube, non-blacklisted blocks only
-    -- the only difference is where the file list comes from."""
+    -- the only difference is where the file list comes from. Returns
+    (palette, stats, sources), same as scan_folder()."""
     png_paths = [p for p in paths if p.lower().endswith(TEXTURE_EXTENSIONS)]
     return _scan_paths(png_paths, progress_callback=progress_callback, color_mode=color_mode)
 

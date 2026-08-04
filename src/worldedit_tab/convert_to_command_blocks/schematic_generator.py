@@ -2,9 +2,9 @@
 import logging
 from tkinter import filedialog
 
-from nbtlib.tag import Compound, List, Int, Short, ByteArray, IntArray
+from nbtlib.tag import Compound, List, Int, Short, IntArray
 
-from ..common.schem_io import save_schematic, make_command_block_entity
+from ..common.schem_io import save_schematic, make_command_block_entity, build_block_data
 
 
 def generate_schematic(gui):
@@ -29,8 +29,11 @@ def generate_schematic(gui):
             palette_key: Int(0)
         })
 
-        # Structure is EXACTLY width × height × length
-        block_data = ByteArray([0] * (width * height * length))
+        # Structure is EXACTLY width × height × length, all pointing at
+        # the single palette entry (index 0), so this was never actually
+        # hit by the varint bug -- routed through build_block_data anyway
+        # for consistency with every other schem writer in this project.
+        block_data = build_block_data(width, height, length, lambda x, y, z: 0)
 
         block_entities = List[Compound]()
 

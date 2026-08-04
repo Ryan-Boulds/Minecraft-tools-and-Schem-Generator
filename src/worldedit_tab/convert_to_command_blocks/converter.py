@@ -1,32 +1,44 @@
 # worldedit_tab/convert_to_command_blocks/converter.py
+"""
+Reads an existing .schem (which may come from anywhere -- a real WorldEdit
+build, not just this app's own output) and converts it into command-block
+forms. Every function here used to read BlockData as one raw byte per
+voxel; the Sponge spec actually defines it as a varint stream, so any
+input schematic with a palette past 128 blocks (routine for a real,
+detailed build) was being silently misread. Fixed via
+common.schem_io.read_block_data() -- see that module's docstring for the
+full story. The three functions that also WRITE a new schematic
+(convert_to_command_blocks, convert_to_command_block_wall,
+convert_to_command_block_wall_projected) only ever use 1-2 palette
+entries in their OUTPUT, so their write side was never actually broken by
+this, but they're routed through build_block_data() too for consistency.
+"""
 import math
 from collections import defaultdict
 
-from nbtlib.tag import Compound, Int, Short, ByteArray, IntArray, List
+from nbtlib.tag import Compound, Int, Short, IntArray, List
 
-from ..common.schem_io import command_block_state, make_command_block_entity
+from ..common.schem_io import command_block_state, make_command_block_entity, build_block_data, read_block_data
 
 AIR_BLOCK = "minecraft:air"
 
 
-# === UNCHANGED FUNCTIONS ===
 def generate_block_list(data, player_pos: tuple[float, float, float]) -> list[str]:
     lines = []
     width = int(data['Width'])
     height = int(data['Height'])
     length = int(data['Length'])
     palette = data['Palette']
-    block_data = data['BlockData']
     offset = data.get('Offset', IntArray([0, 0, 0]))
 
     px, py, pz = player_pos
     inv_palette = {int(v): k for k, v in palette.items()}
+    indices = read_block_data(data['BlockData'], width, height, length)
 
     for hy in range(height):
         for hz in range(length):
             for hx in range(width):
-                idx = hy * (length * width) + hz * width + hx
-                state_id = int(block_data[idx])
+                state_id = indices[hy][hz][hx]
                 block = inv_palette.get(state_id)
 
                 if block and block != AIR_BLOCK:
@@ -44,24 +56,22 @@ def convert_to_command_blocks(data, player_pos: tuple[float, float, float]) -> C
     height = int(data['Height'])
     length = int(data['Length'])
     palette = data['Palette']
-    block_data = data['BlockData']
     offset = data.get('Offset', IntArray([0, 0, 0]))
 
     px, py, pz = map(int, player_pos)
     inv_palette = {int(v): k for k, v in palette.items()}
+    indices = read_block_data(data['BlockData'], width, height, length)
 
     new_palette = Compound({})
     cb_state = command_block_state("up")
     new_palette[cb_state] = Int(0)
 
-    new_block_data = ByteArray([0] * (width * height * length))
     new_block_entities = List[Compound]()
 
     for hy in range(height):
         for hz in range(length):
             for hx in range(width):
-                idx = hy * (length * width) + hz * width + hx
-                state_id = int(block_data[idx])
+                state_id = indices[hy][hz][hx]
                 block = inv_palette.get(state_id)
 
                 if not block or block == AIR_BLOCK:
@@ -73,6 +83,12 @@ def convert_to_command_blocks(data, player_pos: tuple[float, float, float]) -> C
 
                 cmd = f"setblock {abs_x} {abs_y} {abs_z} {block}"
                 new_block_entities.append(make_command_block_entity((hx, hy, hz), cmd))
+
+    # Only one palette entry exists (the command-block state), so every
+    # voxel in the bounding box is index 0 -- unchanged from the original
+    # behavior. Positions with no matching BlockEntity above just become
+    # blank/no-op command blocks.
+    new_block_data = build_block_data(width, height, length, lambda x, y, z: 0)
 
     new_data = Compound({
         "Version": data["Version"],
@@ -97,18 +113,17 @@ def convert_to_command_block_wall(data, player_pos, wall_width: int, facing: str
     height = int(data['Height'])
     length = int(data['Length'])
     palette = data['Palette']
-    block_data = data['BlockData']
     offset = data.get('Offset', IntArray([0, 0, 0]))
 
     px, py, pz = map(int, player_pos)
     inv_palette = {int(v): k for k, v in palette.items()}
+    indices = read_block_data(data['BlockData'], width, height, length)
 
     real_blocks = []
     for hy in range(height):
         for hz in range(length):
             for hx in range(width):
-                idx = hy * (length * width) + hz * width + hx
-                state_id = int(block_data[idx])
+                state_id = indices[hy][hz][hx]
                 block = inv_palette.get(state_id)
 
                 if block and block != AIR_BLOCK:
@@ -133,7 +148,7 @@ def convert_to_command_block_wall(data, player_pos, wall_width: int, facing: str
         "minecraft:stone": Int(1),
     })
 
-    new_block_data = ByteArray([1] * total_slots)
+    new_indices = [[[1] * new_width for _ in range(new_length)] for _ in range(new_height)]  # [y][z][x], default stone
     new_block_entities = List[Compound]()
 
     for i, (local_x, local_y, local_z, block_type) in enumerate(real_blocks):
@@ -156,11 +171,13 @@ def convert_to_command_block_wall(data, player_pos, wall_width: int, facing: str
         abs_y = py + int(offset[1]) + local_y
         abs_z = pz + int(offset[2]) + local_z
 
-        flat_idx = wy * (new_length * new_width) + wz * new_width + wx
-        new_block_data[flat_idx] = 0
+        new_indices[wy][wz][wx] = 0
 
         cmd = f"setblock {abs_x} {abs_y} {abs_z} {block_type}"
         new_block_entities.append(make_command_block_entity((wx, wy, wz), cmd))
+
+    new_block_data = build_block_data(new_width, new_height, new_length,
+                                       lambda x, y, z: new_indices[y][z][x])
 
     if facing == "east":
         offset_x, offset_z = 1, 0
@@ -209,11 +226,11 @@ def convert_to_command_block_wall_projected(
     length = int(data['Length'])
 
     palette = data['Palette']
-    block_data = data['BlockData']
     offset = data.get('Offset', IntArray([0, 0, 0]))
 
     px, py, pz = map(int, player_pos)
     inv_palette = {int(v): k for k, v in palette.items()}
+    indices = read_block_data(data['BlockData'], width, height, length)
 
     # ------------------------------------------
     # Collect all real blocks
@@ -223,9 +240,7 @@ def convert_to_command_block_wall_projected(
     for hy in range(height):
         for hz in range(length):
             for hx in range(width):
-
-                idx = hy * (length * width) + hz * width + hx
-                state_id = int(block_data[idx])
+                state_id = indices[hy][hz][hx]
                 block = inv_palette.get(state_id)
 
                 if block and block != AIR_BLOCK:
@@ -270,8 +285,6 @@ def convert_to_command_block_wall_projected(
 
     new_height = max_height
 
-    total_slots = new_width * new_height * new_length
-
     cb_state = command_block_state(facing)
 
     new_palette = Compound({
@@ -279,7 +292,7 @@ def convert_to_command_block_wall_projected(
         "minecraft:stone": Int(1)
     })
 
-    new_block_data = ByteArray([1] * total_slots)
+    new_indices = [[[1] * new_width for _ in range(new_length)] for _ in range(new_height)]  # [y][z][x], default stone
     new_block_entities = List[Compound]()
 
     # ------------------------------------------
@@ -298,8 +311,7 @@ def convert_to_command_block_wall_projected(
 
             wy = layer
 
-            flat_idx = wy * (new_length * new_width) + wz * new_width + wx
-            new_block_data[flat_idx] = 0
+            new_indices[wy][wz][wx] = 0
 
             # IMPORTANT:
             # command remains original coordinates
@@ -309,6 +321,9 @@ def convert_to_command_block_wall_projected(
 
             cmd = f"setblock {abs_x} {abs_y} {abs_z} {block_type}"
             new_block_entities.append(make_command_block_entity((wx, wy, wz), cmd))
+
+    new_block_data = build_block_data(new_width, new_height, new_length,
+                                       lambda x, y, z: new_indices[y][z][x])
 
     # ------------------------------------------
     # Correct offsets (same as normal wall)

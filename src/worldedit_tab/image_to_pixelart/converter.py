@@ -10,9 +10,9 @@ the Resource Pack Scanner tab, then builds either:
 """
 
 from PIL import Image
-from nbtlib.tag import Compound, Int, Short, ByteArray, IntArray, List
+from nbtlib.tag import Compound, Int, Short, IntArray, List
 
-from ..common.schem_io import command_block_state, make_command_block_entity
+from ..common.schem_io import command_block_state, make_command_block_entity, build_block_data
 
 AIR_BLOCK = "minecraft:air"
 
@@ -109,7 +109,7 @@ def generate_direct_block_schem(block_grid, facing, data_version=3578):
         palette[name] = Int(i)
         block_index[name] = i
 
-    block_data = ByteArray([0] * (w * height * l))
+    index_layers = [[[0] * w for _ in range(l)] for _ in range(height)]  # [y][z][x]
 
     for row_i, row in enumerate(block_grid):
         hy = height - 1 - row_i  # flip so image row 0 (top) ends up at the top
@@ -118,8 +118,9 @@ def generate_direct_block_schem(block_grid, facing, data_version=3578):
                 continue
             hx = col_i if is_ns else 0
             hz = 0 if is_ns else col_i
-            idx = hy * (l * w) + hz * w + hx
-            block_data[idx] = block_index[block]
+            index_layers[hy][hz][hx] = block_index[block]
+
+    block_data = build_block_data(w, height, l, lambda x, y, z: index_layers[y][z][x])
 
     return Compound({
         "Version": Int(2),
@@ -154,7 +155,7 @@ def generate_command_block_wall_schem(block_grid, facing, player_pos, data_versi
 
     cb_state = command_block_state(facing)
     palette = Compound({AIR_BLOCK: Int(0), cb_state: Int(1)})
-    block_data = ByteArray([0] * (w * height * l))
+    index_layers = [[[0] * w for _ in range(l)] for _ in range(height)]  # [y][z][x]
     block_entities = List[Compound]()
 
     for row_i, row in enumerate(block_grid):
@@ -164,14 +165,15 @@ def generate_command_block_wall_schem(block_grid, facing, player_pos, data_versi
                 continue
             hx = col_i if is_ns else 0
             hz = 0 if is_ns else col_i
-            idx = hy * (l * w) + hz * w + hx
-            block_data[idx] = 1
+            index_layers[hy][hz][hx] = 1
 
             abs_x = px + hx
             abs_y = py + hy
             abs_z = pz + hz
             cmd = f"setblock {abs_x} {abs_y} {abs_z} {block}"
             block_entities.append(make_command_block_entity((hx, hy, hz), cmd))
+
+    block_data = build_block_data(w, height, l, lambda x, y, z: index_layers[y][z][x])
 
     return Compound({
         "Version": Int(2),

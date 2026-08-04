@@ -1,5 +1,45 @@
 # worldedit_tab rebuild
 
+## Fix #10 (the big one): BlockData is a varint stream, not one byte per voxel
+
+This is what was actually causing `NullPointerException` on
+`BlockStateHolder.toBaseBlock()` when loading `pixel-mario`. Confirmed
+against the official Sponge Schematic Specification:
+
+> **BlockData: `varint[]`** — "Each integer is bitpacked into a single
+> byte with varint encoding... depending on the length, each proceeding
+> byte is or'ed and current value bit shifted by the length multiplied
+> by 7."
+
+Every writer in this project (and every reader in Conv to cmd blocks)
+was treating `BlockData` as one raw byte per voxel instead of a varint
+stream. A palette index under 128 fits in exactly one varint byte,
+indistinguishable from "just a byte" -- so anything with a small palette
+worked fine, right up until a palette passed 128 entries. Your Mario
+pixel art has 141. Index 128 needs a 2-byte varint; writing it as one
+raw byte misaligns every voxel after it, and the misread eventually
+lands on a byte sequence with no matching palette entry -- a null
+block, which is exactly the NPE. It could also crash outright before
+even producing a file: nbtlib's `ByteArray` refuses values outside
+-128..127, so assigning a raw index of 128+ throws `OverflowError`.
+
+Fixed with `build_block_data()` / `read_block_data()` in
+`common/schem_io.py` -- proper varint encode/decode, used everywhere
+BlockData is written or read now, including the **Conv to cmd blocks**
+tab's reader (which parses schematics that could come from anywhere,
+not just this app -- a real detailed WorldEdit build routinely has a
+palette well past 128 blocks, so that read path had the exact same bug
+in reverse).
+
+Verified with a full round trip at Mario's exact scale (141-entry
+palette, 100x67 image, all 6,700 voxels checked byte-for-byte after a
+real save/load cycle) and with the Conv to cmd blocks tab reading a
+synthetic 150-block external-style schematic.
+
+**Re-generate any pixel art with a large palette** -- anything saved
+before this fix has scrambled BlockData past whichever voxel first hit
+palette index 128.
+
 ## Fix history (read this if a schematic still won't load or look right)
 
 **1. Root NBT wrapper — added by mistake, then reverted.** An early pass
@@ -86,6 +126,30 @@ within one session):
   save-location dialog (its own separate memory, since you're not
   usually saving schematics next to your source photos)
 
+## New: Review / Edit Palette window
+
+`orange_glazed_terracotta` (and anything else that scans a little oddly)
+can now be caught by eye before it ends up in a build. A new **Review /
+Edit Palette...** button opens a scrollable window showing every
+texture currently in the palette as a big (96x96, upscaled with nearest-
+neighbor so pixel art stays crisp) thumbnail, sorted alphabetically:
+
+- Click a texture to select it (highlights blue).
+- **Remove Selected** or the **Delete** key drops it from the list.
+- **Undo** brings back the most recently removed one.
+- **Save Selections** commits your edits back into the palette (and
+  refreshes the preview below); **Cancel** closes the window and
+  discards whatever you removed.
+
+Only after you click Save Selections does anything change -- closing
+the window with Cancel (or the OS close button) leaves the palette
+exactly as it was. Saving the edited palette to JSON afterward is still
+the same "Save Palette JSON" button as before.
+
+If a palette entry came from a live scan, its real texture is shown; if
+it came from a previously-saved palette JSON (no source file on hand),
+a plain color swatch is shown instead as a fallback.
+
 ## New: custom / curated texture selection
 
 Two new buttons on the Resource Pack Scanner tab, both **merge into**
@@ -137,12 +201,13 @@ own block color. Only the real texture is used.
 worldedit_tab/
   worldedit_gui.py                 <- create_worldedit_schematic_gui(frame, gui), same signature as before
   common/
-    schem_io.py                    <- save_schematic / load_schematic / command-block helpers, used by every tab
+    schem_io.py                    <- save_schematic / load_schematic / build_block_data / read_block_data / command-block helpers, used by every tab
     recent_paths.py                <- remembers the last folder used per file-dialog kind, across runs
   convert_to_command_blocks/       <- (renamed from command_block_generator) your original tab, bugs fixed
   resource_pack_scanner/           <- scan a texture folder -> dominant (or average) RGB per full-cube block -> palette JSON
     valid_blocks.json              <- bundled list of full-cube vanilla block ids (strict mode)
     all_blocks.json                <- bundled list of every vanilla block id (baseline for custom/curated additions)
+    review_window.py               <- post-scan thumbnail review/edit window (select, remove, undo, save/cancel)
   image_to_pixelart/               <- image -> block grid -> direct-block or command-block-wall schem
   gif_placeholder/                 <- stub UI, not implemented
   video_placeholder/                <- stub UI, not implemented

@@ -3,21 +3,45 @@
 Shared helpers for reading and writing WorldEdit .schem files (Sponge
 Schematic Format, versions 1/2/3).
 
-THE BUG THAT WAS BREAKING EVERY GENERATED SCHEMATIC
------------------------------------------------------
-The Sponge Schematic spec requires the top-level NBT tag to be an UNNAMED
-compound that contains exactly one key, "Schematic", which in turn holds
-Version/Width/Height/Length/Palette/BlockData/etc.
+THE BIG ONE: BlockData IS A VARINT STREAM, NOT ONE BYTE PER VOXEL
+-------------------------------------------------------------------
+Per the official Sponge Schematic Specification, BlockData is typed
+`varint[]`: "Each integer is bitpacked into a single byte with varint
+encoding... depending on the length, each proceeding byte is or'ed and
+current value bit shifted by the length multiplied by 7." Every writer
+in this project (and every reader in convert_to_command_blocks) used to
+treat BlockData as one raw byte per voxel instead. A palette index under
+128 fits in exactly one varint byte, which is indistinguishable from
+"just a byte" -- so small-palette schematics worked by coincidence,
+right up until a palette passed 128 entries (index 128 needs a 2-byte
+varint). Writing it as a single byte after that point misaligns every
+voxel that follows, and the misread eventually lands on garbage that
+doesn't match any palette entry -- a null block, which is exactly the
+`NullPointerException` on `BlockStateHolder.toBaseBlock()` a 141-block
+Mario pixel-art schematic hit. Worse, the naive write path could crash
+outright: nbtlib's ByteArray refuses values outside -128..127, so
+assigning a raw palette index of 128+ throws `OverflowError` before a
+file even gets written.
 
-The old code did:
+Fixed with build_block_data() (write) and read_block_data() (read),
+which correctly varint-encode/decode the whole stream. Every schem
+writer and reader in this project goes through these now -- see their
+docstrings below for the full explanation.
 
-    schematic = nbtlib.File(schematic_data)   # schematic_data = the data itself
+THE ROOT-WRAPPER BUG (fixed, then correctly un-fixed)
+---------------------------------------------------------
+An early version of this file wrapped every written .schem in
+`{"Schematic": {...}}`, on the theory the format required it. It
+doesn't -- WorldEdit's SpongeSchematicReader.getBaseTag() reads the NBT
+root tag directly, no wrapper. That extra layer is what caused
+`missing a "Version" tag` errors. Reverted: schematic data is written
+straight to the NBT root.
 
-That writes `schematic_data`'s keys directly at the NBT root, with no
-"Schematic" wrapper. WorldEdit/Minecraft can't find `Schematic` at the root,
-so //schem load (and dragging the file into a schematics folder) silently
-fails or errors out. Every tab that saves a .schem needs to go through
-`save_schematic()` below so this only has to be fixed in one place.
+BLOCKENTITY Id CASING
+----------------------
+Every block entity needs a *required* `Id` tag (capital I). Getting the
+case wrong (lowercase "id") is a very plausible cause of a schematic
+failing to load outright, since it's a required tag.
 """
 
 import gzip
@@ -33,10 +57,8 @@ def save_schematic(schematic_compound: Compound, file_path: str) -> None:
     IMPORTANT: WorldEdit's SpongeSchematicReader.getBaseTag() reads the NBT
     root tag directly and requires Version/Width/Palette/BlockData/etc. to
     live right there -- there is NO "Schematic" wrapper key in this format.
-    (An earlier version of this file added one; that was wrong and broke
-    loading. Verified against WorldEdit's actual source.) So this just
-    writes `schematic_compound`'s keys straight to the NBT root, same as
-    your known-working timeline_exporter code does.
+    So this just writes `schematic_compound`'s keys straight to the NBT
+    root, same as your known-working timeline_exporter code does.
     """
     nbt_file = nbtlib.File(schematic_compound)
     with open(file_path, "wb") as f:
@@ -95,6 +117,97 @@ def load_schematic(file_path: str):
 
 def command_block_state(facing: str) -> str:
     return f"minecraft:command_block[conditional=false,facing={facing}]"
+
+
+def encode_varint(value: int):
+    """LEB128-style varint encoding, exactly as the Sponge schematic spec
+    requires for BlockData/BiomeData entries: 7 data bits per byte, high
+    bit set on every byte except the last. Returns a list of UNSIGNED
+    byte values (0-255) -- caller must convert to nbtlib's signed byte
+    range before storing (see build_block_data)."""
+    out = []
+    while True:
+        b = value & 0x7F
+        value >>= 7
+        if value:
+            out.append(b | 0x80)
+        else:
+            out.append(b)
+            return out
+
+
+def decode_varint(data, pos: int = 0):
+    """Inverse of encode_varint(). Returns (value, next_pos). `data` must
+    be indexable and yield unsigned 0-255 byte values (see
+    _unsigned_bytes() if reading from an nbtlib ByteArray)."""
+    result = 0
+    shift = 0
+    while True:
+        b = data[pos]
+        pos += 1
+        result |= (b & 0x7F) << shift
+        if not (b & 0x80):
+            return result, pos
+        shift += 7
+
+
+def _unsigned_bytes(values):
+    """Convert an iterable of signed byte values (-128..127, e.g. from an
+    nbtlib ByteArray) to unsigned (0..255)."""
+    return [(v + 256) if v < 0 else v for v in values]
+
+
+def build_block_data(width, height, length, index_at) -> ByteArray:
+    """Build the BlockData ByteArray tag, correctly varint-encoded per the
+    Sponge schematic spec.
+
+    THIS IS THE FIX for a schematic that pastes as mostly-blank / loads
+    with a NullPointerException on BlockStateHolder.toBaseBlock() once
+    the palette passes 128 entries. The spec defines BlockData as a
+    `varint[]`, NOT one raw byte per voxel -- a palette index under 128
+    fits in a single varint byte (indistinguishable from "just a byte"),
+    which is exactly why small-palette schematics worked fine and this
+    stopped working the moment a palette grew past 128 unique blocks:
+    index 128 needs a 2-byte varint, and writing it as one raw byte
+    misaligns every voxel that follows, eventually landing on a byte
+    sequence that decodes to an index with no matching palette entry --
+    a null block, which is exactly the NPE this was causing.
+
+    `index_at(x, y, z)` should return the palette index (int) for that
+    voxel. Iterates in the exact order the spec requires -- x fastest,
+    then z, then y (`x + z * Width + y * Width * Length`) -- and appends
+    each voxel's variable-length varint to a growing byte stream, so the
+    final array length is NOT necessarily width*height*length; it's
+    exactly that only when every index fits in one byte.
+    """
+    raw = []
+    for y in range(height):
+        for z in range(length):
+            for x in range(width):
+                raw.extend(encode_varint(index_at(x, y, z)))
+    signed = [(b - 256) if b > 127 else b for b in raw]
+    return ByteArray(signed)
+
+
+def read_block_data(block_data, width, height, length):
+    """Decode a varint-encoded BlockData ByteArray (or plain list of
+    signed byte values) into a 3D nested list indices[y][z][x] -> int
+    palette index. This is the read-side counterpart to
+    build_block_data() -- needed any time we load a schematic that might
+    have come from somewhere else (a real WorldEdit build, not just our
+    own output), since those routinely have palettes well past 128
+    blocks and the old code's flat one-byte-per-voxel indexing would
+    silently misread them the same way it silently miswrote them.
+    """
+    unsigned = _unsigned_bytes(block_data)
+    pos = 0
+    indices = [[[0] * width for _ in range(length)] for _ in range(height)]
+    for y in range(height):
+        for z in range(length):
+            for x in range(width):
+                val, pos = decode_varint(unsigned, pos)
+                indices[y][z][x] = val
+    return indices
 
 
 def make_command_block_entity(pos, command: str, custom_name: str = None) -> Compound:
