@@ -30,7 +30,7 @@ def create_converter_subframe(parent, gui):
 
     tk.Label(top_frame, text="Schematic File:", bg='#f0f0f0').pack(side="left")
     file_path_var = tk.StringVar()
-    tk.Entry(top_frame, textvariable=file_path_var, width=60).pack(side="left", padx=8, fill="x", expand=True)
+    tk.Entry(top_frame, textvariable=file_path_var, width=60).pack(side="left", padx=8)
     tk.Button(top_frame, text="Browse", command=lambda: _browse_file(file_path_var),
               bg='#2196F3', fg='white').pack(side="left")
 

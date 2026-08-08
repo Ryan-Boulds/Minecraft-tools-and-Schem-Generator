@@ -5,30 +5,55 @@ from tkinter import ttk
 from .convert_to_command_blocks.gui import create_converter_subframe
 from .resource_pack_scanner.gui import create_resource_pack_scanner_subframe
 from .image_to_pixelart.gui import create_image_to_pixelart_subframe
-from .gif_placeholder.gui import create_gif_placeholder_subframe
-from .video_placeholder.gui import create_video_placeholder_subframe
+from .image_command_blocks.gui import create_image_command_blocks_subframe
+from .gif_command_blocks.gui import create_gif_command_blocks_subframe
+from .video_command_blocks.gui import create_video_command_blocks_subframe
 
 
 def create_worldedit_schematic_gui(frame, gui):
-    """WorldEdit Schematic Tab - now a Notebook with multiple subtabs:
-       Conv to cmd blocks, Resource Pack Scanner, Image to Pixel Art,
-       GIF (placeholder), Video (placeholder)."""
+    """WorldEdit Schematic Tab - a top-level Notebook with two tabs:
+       Media Creator (Image to Pixel Art, Image Command Blocks, GIF
+       Command Blocks, Video) and Setup Tools (Conv to cmd blocks,
+       Resource Pack Scanner) -- each holding its own nested Notebook
+       of subtabs."""
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(0, weight=1)
 
-    notebook = ttk.Notebook(frame)
-    notebook.grid(row=0, column=0, sticky="nsew")
+    top_notebook = ttk.Notebook(frame)
+    top_notebook.grid(row=0, column=0, sticky="nsew")
 
-    tabs = [
-        ("Conv to cmd blocks", _scrollable(notebook, lambda parent: create_converter_subframe(parent, gui))),
-        ("Resource Pack Scanner", _scrollable(notebook, lambda parent: create_resource_pack_scanner_subframe(parent, gui))),
-        ("Image to Pixel Art", _scrollable(notebook, lambda parent: create_image_to_pixelart_subframe(parent, gui))),
-        ("GIF (soon)", _scrollable(notebook, lambda parent: create_gif_placeholder_subframe(parent, gui))),
-        ("Video (soon)", _scrollable(notebook, lambda parent: create_video_placeholder_subframe(parent, gui))),
+    media_frame = ttk.Frame(top_notebook)
+    setup_frame = ttk.Frame(top_notebook)
+    top_notebook.add(media_frame, text="Media Creator")
+    top_notebook.add(setup_frame, text="Setup Tools")
+
+    media_notebook = _nested_notebook(media_frame)
+    media_tabs = [
+        ("Image to Pixel Art", _scrollable(media_notebook, lambda parent: create_image_to_pixelart_subframe(parent, gui))),
+        ("Image Command Blocks", _scrollable(media_notebook, lambda parent: create_image_command_blocks_subframe(parent, gui))),
+        ("GIF Command Blocks", _scrollable(media_notebook, lambda parent: create_gif_command_blocks_subframe(parent, gui))),
+        ("Video", _scrollable(media_notebook, lambda parent: create_video_command_blocks_subframe(parent, gui))),
     ]
+    for label, tab_frame in media_tabs:
+        media_notebook.add(tab_frame, text=label)
 
-    for label, tab_frame in tabs:
-        notebook.add(tab_frame, text=label)
+    setup_notebook = _nested_notebook(setup_frame)
+    setup_tabs = [
+        ("Conv to cmd blocks", _scrollable(setup_notebook, lambda parent: create_converter_subframe(parent, gui))),
+        ("Resource Pack Scanner", _scrollable(setup_notebook, lambda parent: create_resource_pack_scanner_subframe(parent, gui))),
+    ]
+    for label, tab_frame in setup_tabs:
+        setup_notebook.add(tab_frame, text=label)
+
+
+def _nested_notebook(parent):
+    """A Notebook that fills its parent frame -- used for the inner
+    (Media Creator / Setup Tools) tab groups."""
+    parent.columnconfigure(0, weight=1)
+    parent.rowconfigure(0, weight=1)
+    notebook = ttk.Notebook(parent)
+    notebook.grid(row=0, column=0, sticky="nsew")
+    return notebook
 
 
 def _scrollable(notebook, build_content_fn):

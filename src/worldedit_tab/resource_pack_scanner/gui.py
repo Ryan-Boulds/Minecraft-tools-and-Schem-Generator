@@ -1,12 +1,13 @@
 # worldedit_tab/resource_pack_scanner/gui.py
 
 import os
+import queue
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-from .scanner import scan_folder, scan_specific_files, collect_png_paths, save_palette, load_palette
-from ..common.recent_paths import get_dir, remember
+from .scanner import scan_folder, scan_specific_files, collect_png_paths, save_palette, load_palette, find_texture_sources
+from ..common.recent_paths import get_dir, remember, remember_file, get_initial_file_args
 from .review_window import open_review_window
 
 
@@ -40,7 +41,7 @@ def create_resource_pack_scanner_subframe(parent, gui):
 
     tk.Label(top_frame, text="Texture Folder:", bg='#f0f0f0').pack(side="left")
     folder_var = tk.StringVar()
-    tk.Entry(top_frame, textvariable=folder_var, width=60).pack(side="left", padx=8, fill="x", expand=True)
+    tk.Entry(top_frame, textvariable=folder_var, width=60).pack(side="left", padx=8)
     tk.Button(top_frame, text="Browse", command=lambda: _browse_folder(folder_var),
               bg='#2196F3', fg='white').pack(side="left")
 
@@ -90,18 +91,26 @@ def create_resource_pack_scanner_subframe(parent, gui):
         text_list.delete("1.0", "end")
         status_var.set("Scanning...")
 
+        color_mode = color_mode_var.get()  # read on the main thread -- Tkinter Variables aren't safe from a worker thread
+
+        # Tkinter widgets (including .after()) aren't safe to touch from a
+        # background thread -- the worker only ever pushes plain data into
+        # this queue; only the main thread (via the self-rescheduling
+        # _poll() below) touches any widget.
+        result_queue = queue.Queue()
+
         def progress(i, total, name):
             if i % 25 == 0 or i == total:
-                text_list.after(0, lambda: status_var.set(f"Scanning {i}/{total}: {name}"))
+                result_queue.put(("progress", i, total, name))
 
         def worker():
             try:
                 palette, stats, sources = scan_folder(folder, progress_callback=progress,
-                                                        color_mode=color_mode_var.get())
+                                                        color_mode=color_mode)
             except Exception as e:
-                text_list.after(0, lambda: _on_error(str(e)))
+                result_queue.put(("error", str(e)))
                 return
-            text_list.after(0, lambda: _on_scan_done(palette, stats, sources))
+            result_queue.put(("done", palette, stats, sources))
 
         def _on_error(msg):
             state["scanning"] = False
@@ -113,7 +122,7 @@ def create_resource_pack_scanner_subframe(parent, gui):
             state["palette"] = palette  # replaces -- this is the "start fresh from a pack" action
             state["sources"] = sources
             status_var.set(
-                f"Done ({color_mode_var.get()} color). {stats['scanned']} block colors kept, "
+                f"Done ({color_mode} color). {stats['scanned']} block colors kept, "
                 f"{stats['not_a_block']} skipped (not a valid full-cube block), "
                 f"{stats['emissive_skipped']} skipped (emissive/glow textures), "
                 f"{stats['skipped']} skipped (transparent/unreadable), "
@@ -123,7 +132,27 @@ def create_resource_pack_scanner_subframe(parent, gui):
             if gui is not None and hasattr(gui, "print_to_text"):
                 gui.print_to_text(f"Resource pack scan complete: {len(palette)} colors.", "normal")
 
+        def _poll():
+            try:
+                while True:
+                    item = result_queue.get_nowait()
+                    if item[0] == "progress":
+                        _, i, total, name = item
+                        status_var.set(f"Scanning {i}/{total}: {name}")
+                    elif item[0] == "done":
+                        _, palette, stats, sources = item
+                        _on_scan_done(palette, stats, sources)
+                        return
+                    elif item[0] == "error":
+                        _on_error(item[1])
+                        return
+            except queue.Empty:
+                pass
+            if state["scanning"]:
+                frame.after(100, _poll)
+
         threading.Thread(target=worker, daemon=True).start()
+        frame.after(100, _poll)
 
     def _add_paths(paths, source_label):
         if not paths:
@@ -133,19 +162,22 @@ def create_resource_pack_scanner_subframe(parent, gui):
         state["scanning"] = True
         status_var.set(f"Adding {len(paths)} texture(s) from {source_label}...")
 
+        color_mode = color_mode_var.get()  # read on the main thread -- Tkinter Variables aren't safe from a worker thread
+        result_queue = queue.Queue()
+
         def progress(i, total, name):
             if i % 10 == 0 or i == total:
-                text_list.after(0, lambda: status_var.set(f"Adding {i}/{total}: {name}"))
+                result_queue.put(("progress", i, total, name))
 
         def worker():
             try:
                 palette, stats, sources = scan_specific_files(
-                    paths, progress_callback=progress, color_mode=color_mode_var.get(),
+                    paths, progress_callback=progress, color_mode=color_mode,
                 )
             except Exception as e:
-                text_list.after(0, lambda: _on_error(str(e)))
+                result_queue.put(("error", str(e)))
                 return
-            text_list.after(0, lambda: _on_add_done(palette, stats, sources, source_label))
+            result_queue.put(("done", palette, stats, sources))
 
         def _on_error(msg):
             state["scanning"] = False
@@ -168,7 +200,27 @@ def create_resource_pack_scanner_subframe(parent, gui):
             if gui is not None and hasattr(gui, "print_to_text"):
                 gui.print_to_text(f"Added {added} custom texture color(s) from {label}.", "normal")
 
+        def _poll():
+            try:
+                while True:
+                    item = result_queue.get_nowait()
+                    if item[0] == "progress":
+                        _, i, total, name = item
+                        status_var.set(f"Adding {i}/{total}: {name}")
+                    elif item[0] == "done":
+                        _, palette, stats, sources = item
+                        _on_add_done(palette, stats, sources, source_label)
+                        return
+                    elif item[0] == "error":
+                        _on_error(item[1])
+                        return
+            except queue.Empty:
+                pass
+            if state["scanning"]:
+                frame.after(100, _poll)
+
         threading.Thread(target=worker, daemon=True).start()
+        frame.after(100, _poll)
 
     def add_custom_folder():
         path = filedialog.askdirectory(title="Select a folder of curated textures",
@@ -201,13 +253,13 @@ def create_resource_pack_scanner_subframe(parent, gui):
             defaultextension=".json",
             filetypes=[("Block color palette", "*.json")],
             title="Save block color palette",
-            initialdir=get_dir("palette_json"),
+            **get_initial_file_args("palette_json"),
         )
         if not out_path:
             return
         try:
             save_palette(state["palette"], out_path)
-            remember("palette_json", out_path)
+            remember_file("palette_json", out_path)
             status_var.set(f"Palette saved to {out_path}")
         except Exception as e:
             messagebox.showerror("Save failed", str(e))
@@ -216,7 +268,7 @@ def create_resource_pack_scanner_subframe(parent, gui):
         in_path = filedialog.askopenfilename(
             filetypes=[("Block color palette", "*.json")],
             title="Load block color palette",
-            initialdir=get_dir("palette_json"),
+            **get_initial_file_args("palette_json"),
         )
         if not in_path:
             return
@@ -224,7 +276,7 @@ def create_resource_pack_scanner_subframe(parent, gui):
             palette = load_palette(in_path)
             state["palette"] = palette
             state["sources"] = {}  # unknown -- loaded from JSON, not a live scan
-            remember("palette_json", in_path)
+            remember_file("palette_json", in_path)
             _refresh_preview()
             status_var.set(f"Loaded {len(palette)} colors from {in_path}")
         except Exception as e:
@@ -235,6 +287,20 @@ def create_resource_pack_scanner_subframe(parent, gui):
             messagebox.showinfo("Nothing to review", "Run a scan or add some textures first.")
             return
         open_review_window(frame, state, status_var, _refresh_preview, on_top_of=frame.winfo_toplevel())
+
+    def locate_textures_for_preview():
+        if not state["palette"]:
+            messagebox.showinfo("Nothing loaded", "Load or scan a palette first.")
+            return
+        path = filedialog.askdirectory(title="Select a resource pack folder (to find texture previews)",
+                                        initialdir=get_dir("texture_folder"))
+        if not path:
+            return
+        remember("texture_folder", path)
+        found = find_texture_sources(state["palette"].keys(), path)
+        state["sources"].update(found)
+        status_var.set(f"Found textures for {len(found)} of {len(state['palette'])} palette "
+                        f"entries in {path} -- Review / Edit Palette will show them now.")
 
     # Buttons
     btn_frame = tk.Frame(frame, bg='#f0f0f0')
@@ -248,6 +314,8 @@ def create_resource_pack_scanner_subframe(parent, gui):
               bg='#FF9800', fg='white', width=20).pack(side="left", padx=6)
     tk.Button(btn_frame, text="Load Existing Palette", command=load_existing,
               bg='#607D8B', fg='white', width=22).pack(side="left", padx=6)
+    tk.Button(btn_frame, text="Locate Textures for Previews...", command=locate_textures_for_preview,
+              bg='#795548', fg='white', width=26).pack(side="left", padx=6)
 
     custom_btn_frame = tk.Frame(frame, bg='#f0f0f0')
     custom_btn_frame.grid(row=8, column=0, columnspan=3, sticky="ew", padx=10, pady=(0, 10))

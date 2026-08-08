@@ -323,3 +323,27 @@ def save_palette(palette: dict, out_path: str):
 def load_palette(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def find_texture_sources(palette_keys, folder_path: str) -> dict:
+    """For a palette loaded from JSON (no known source file per entry,
+    so the Review window can only show plain color swatches), point this
+    at a resource pack folder and it'll match each palette key
+    ("minecraft:white_wool") to a texture file in that folder by
+    filename ("white_wool.png"), if one exists -- letting the Review
+    window show the real texture instead of a swatch. Doesn't touch the
+    palette's colors at all, only fills in source paths for display.
+    Returns {palette_key: file_path} for whatever it found; keys with no
+    matching file are simply absent from the result.
+    """
+    wanted = {}
+    for key in palette_keys:
+        name = key.split(":", 1)[1] if ":" in key else key
+        wanted[name] = key
+
+    found = {}
+    for path in collect_png_paths(folder_path):
+        stem = os.path.splitext(os.path.basename(path))[0]
+        if stem in wanted:
+            found[wanted[stem]] = path
+    return found

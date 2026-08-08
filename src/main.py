@@ -110,13 +110,13 @@ class CommandModifierGUI:
         self.main_notebook.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
         self.cmd_gen_frame = ttk.Frame(self.main_notebook)
-        self.cmd_blocks_frame = ttk.Frame(self.main_notebook)
+        self.import_media_frame = ttk.Frame(self.main_notebook)
         self.laser_animations_frame = ttk.Frame(self.main_notebook)
         self.time_recorder_frame = ttk.Frame(self.main_notebook)
         self.settings_frame = ttk.Frame(self.main_notebook)
 
         self.main_notebook.add(self.cmd_gen_frame, text="Command Generation")
-        self.main_notebook.add(self.cmd_blocks_frame, text="Command Blocks")
+        self.main_notebook.add(self.import_media_frame, text="Import Media")
         self.main_notebook.add(self.laser_animations_frame, text="Laser Animations")
         self.main_notebook.add(self.time_recorder_frame, text="Time Recorder")
         self.main_notebook.add(self.settings_frame, text="Settings")
@@ -148,15 +148,13 @@ class CommandModifierGUI:
         create_generate_end_beam_gui(self.generate_end_beam_frame, self)
         create_rename_tag_group_gui(self.rename_tag_group_frame, self)
 
-        # Command Blocks
-        self.cmd_blocks_notebook = ttk.Notebook(self.cmd_blocks_frame)
-        self.cmd_blocks_notebook.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
-        self.cmd_blocks_frame.columnconfigure(0, weight=1)
-        self.cmd_blocks_frame.rowconfigure(0, weight=1)
-
-        self.worldedit_frame = ttk.Frame(self.cmd_blocks_notebook)
-        self.cmd_blocks_notebook.add(self.worldedit_frame, text="Add WorldEdit Schematic")
-        create_worldedit_schematic_gui(self.worldedit_frame, self)
+        # Import Media -- create_worldedit_schematic_gui builds its own
+        # nested Notebook directly inside this frame: Level 2 is Media
+        # Creator / Setup Tools, Level 3 is Conv to cmd blocks, Resource
+        # Pack Scanner, Image to Pixel Art, Image Command Blocks, GIF
+        # Command Blocks, Video. This IS the top-level main-notebook tab
+        # now, so there's no extra wrapper notebook in between.
+        create_worldedit_schematic_gui(self.import_media_frame, self)
 
         # Laser Animations (Generate Laser / Animate / Duplicate-Mirror sub-tabs)
         create_laser_animations_gui(self.laser_animations_frame, self)
@@ -193,9 +191,6 @@ class CommandModifierGUI:
         if main_text == "Command Generation":
             sub_id = self.cmd_gen_notebook.select()
             return self.cmd_gen_notebook.tab(sub_id, "text") if sub_id else ""
-        elif main_text == "Command Blocks":
-            sub_id = self.cmd_blocks_notebook.select()
-            return self.cmd_blocks_notebook.tab(sub_id, "text") if sub_id else ""
         elif main_text == "Laser Animations":
             sub_id = self.laser_animations_notebook.select()
             return self.laser_animations_notebook.tab(sub_id, "text") if sub_id else ""
@@ -310,7 +305,9 @@ class CommandModifierGUI:
         elif current_tab == "Rename Tag/Group":
             from rename_tag_group_tab.modifier import process_command
             process_command(self, command)
-        elif current_tab == "Add WorldEdit Schematic":
+        elif current_tab == "Import Media":
+            # NOTE: this branch is stale -- see the note below the class for
+            # why it will raise ImportError if it's ever actually reached.
             from worldedit_tab.modifier import process_command
             process_command(self, command)
         elif current_tab == "Modify Properties":
@@ -331,3 +328,27 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = CommandModifierGUI(root)
     root.mainloop()
+
+# ---------------------------------------------------------------------------
+# NOTE on the "Import Media" branch in process_command() above:
+#
+# get_current_tab_text() only ever returns ONE level deep -- for the
+# "Import Media" main tab it just returns "Import Media" itself (the final
+# `return main_text` fallback), it never drills into worldedit_tab's own
+# nested Media Creator/Setup Tools -> 6-subtab structure to see which of
+# those six very different subtabs is actually open. So this branch fires
+# uniformly whenever any part of the Import Media UI is open, regardless of
+# which subtab is active.
+#
+# It also imports `worldedit_tab.modifier`, a module that doesn't exist in
+# the rebuilt worldedit_tab package (only convert_to_command_blocks/
+# modifier.py does, handling just that one subtab). So today, if the global
+# clipboard hotkey ever fires while Import Media is open, this branch raises
+# ImportError.
+#
+# I didn't fix this, since the six subtabs do genuinely different things now
+# (a single "process clipboard" action doesn't map cleanly onto all of them
+# the way it used to for the old single-purpose tab) -- happy to wire this
+# up properly once you tell me what you want the hotkey to do here, if
+# anything.
+# ---------------------------------------------------------------------------

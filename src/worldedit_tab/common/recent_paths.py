@@ -6,13 +6,23 @@ opens, it starts where you left off instead of some default location.
 Persisted to a small JSON file in the user's home directory so it
 survives between runs of the app, not just within one session.
 
+Two levels of memory:
+  * remember()/get_dir() -- just the folder, like before.
+  * remember_file()/get_initial_file_args() -- the exact file, so the
+    dialog can pre-select it (not just open in the right folder). Falls
+    back to folder-only if the exact file's gone or was never recorded.
+
 Usage:
-    from ..common.recent_paths import get_dir, remember
+    from ..common.recent_paths import get_dir, remember, remember_file, get_initial_file_args
 
     initial = get_dir("texture_folder")
     path = filedialog.askdirectory(initialdir=initial)
     if path:
         remember("texture_folder", path)
+
+    path = filedialog.askopenfilename(**get_initial_file_args("palette_json"))
+    if path:
+        remember_file("palette_json", path)
 """
 
 import json
@@ -31,6 +41,14 @@ def _load() -> dict:
         except Exception:
             _cache = {}
     return _cache
+
+
+def _save(data: dict) -> None:
+    try:
+        with open(_CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+    except Exception:
+        pass  # best-effort -- never let this break a file dialog
 
 
 def get_dir(key: str, default: str = None) -> str:
@@ -53,8 +71,28 @@ def remember(key: str, path: str) -> None:
         return
     data = _load()
     data[key] = directory
-    try:
-        with open(_CONFIG_PATH, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-    except Exception:
-        pass  # best-effort -- never let this break a file dialog
+    _save(data)
+
+
+def remember_file(key: str, path: str) -> None:
+    """Like remember(), but also records the exact file so a future
+    get_initial_file_args() call can pre-select it, not just open its
+    folder."""
+    if not path:
+        return
+    remember(key, path)
+    data = _load()
+    data[f"{key}__file"] = path
+    _save(data)
+
+
+def get_initial_file_args(key: str) -> dict:
+    """Returns kwargs to spread into filedialog.askopenfilename()/
+    asksaveasfilename(): {"initialdir": ..., "initialfile": ...} with the
+    exact last-used file pre-selected, if it still exists -- otherwise
+    just {"initialdir": ...} from the last-used folder (get_dir()'s
+    normal behavior)."""
+    path = _load().get(f"{key}__file")
+    if path and os.path.isfile(path):
+        return {"initialdir": os.path.dirname(path), "initialfile": os.path.basename(path)}
+    return {"initialdir": get_dir(key)}

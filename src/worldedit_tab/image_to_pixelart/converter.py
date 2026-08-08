@@ -1,18 +1,19 @@
 # worldedit_tab/image_to_pixelart/converter.py
 """
 Converts a photo into a grid of block ids using a color palette produced by
-the Resource Pack Scanner tab, then builds either:
-  * a direct-block .schem (the picture, made of real blocks) — "Convert to
-    blocks" mode, or
-  * a wall of command blocks whose setblock commands target the absolute
-    world coordinates the player was standing at when the palette/scan was
-    taken — "command block wall" mode.
+the Resource Pack Scanner tab, then builds a direct-block .schem -- the
+picture, made of real blocks, ready to //paste directly.
+
+(This tab used to also have a command-block-wall mode placed by a single
+player position + local offsets. That's been removed -- the Image Command
+Blocks tab supersedes it with a much better placed-by-corner-coordinates
+model, and this tab is now direct-blocks-only, on purpose.)
 """
 
-from PIL import Image
+from PIL import Image, ImageOps
 from nbtlib.tag import Compound, Int, Short, IntArray, List
 
-from ..common.schem_io import command_block_state, make_command_block_entity, build_block_data
+from ..common.schem_io import build_block_data
 
 AIR_BLOCK = "minecraft:air"
 
@@ -37,7 +38,21 @@ def locked_dimension(orig_w: int, orig_h: int, known_w: int = None, known_h: int
 
 
 def load_source_image(image_path: str) -> Image.Image:
-    return Image.open(image_path).convert("RGBA")
+    """Loads an image and normalizes it to how it's meant to be viewed.
+
+    Portrait photos (especially from phones) are very often stored with
+    the raw sensor data in landscape orientation plus an EXIF
+    "Orientation" tag telling viewers to rotate it on display -- PIL's
+    Image.open() does NOT apply that tag automatically, so without this,
+    a portrait photo's raw pixel data comes out sideways (landscape) and
+    everything built from it (pixel grid, block schem) ends up rotated.
+    ImageOps.exif_transpose() applies the tag and returns an image in
+    its correct, already-upright orientation; it's a safe no-op for
+    images with no orientation tag (most PNGs, screenshots, etc.).
+    """
+    image = Image.open(image_path)
+    image = ImageOps.exif_transpose(image)
+    return image.convert("RGBA")
 
 
 def build_pixel_grid(image: Image.Image, target_w: int, target_h: int):
@@ -132,59 +147,6 @@ def generate_direct_block_schem(block_grid, facing, data_version=3578):
         "Palette": palette,
         "BlockData": block_data,
         "BlockEntities": List[Compound](),
-        "Offset": IntArray([0, 0, 0]),
-        "Metadata": Compound({}),
-    })
-
-
-def generate_command_block_wall_schem(block_grid, facing, player_pos, data_version=3578):
-    """Build a data Compound: a flat wall of command blocks (one per opaque
-    pixel) whose Command runs `setblock` at the absolute world position
-    derived from `player_pos` (the coordinates recorded when the reference
-    scan/photo was taken) plus that pixel's offset in the wall."""
-    target_h = len(block_grid)
-    target_w = len(block_grid[0]) if target_h else 0
-    width, height, thickness, is_ns = _plane_dims(target_w, target_h, facing)
-
-    if is_ns:
-        w, l = width, thickness
-    else:
-        w, l = thickness, width
-
-    px, py, pz = map(int, player_pos)
-
-    cb_state = command_block_state(facing)
-    palette = Compound({AIR_BLOCK: Int(0), cb_state: Int(1)})
-    index_layers = [[[0] * w for _ in range(l)] for _ in range(height)]  # [y][z][x]
-    block_entities = List[Compound]()
-
-    for row_i, row in enumerate(block_grid):
-        hy = height - 1 - row_i
-        for col_i, block in enumerate(row):
-            if block is None:
-                continue
-            hx = col_i if is_ns else 0
-            hz = 0 if is_ns else col_i
-            index_layers[hy][hz][hx] = 1
-
-            abs_x = px + hx
-            abs_y = py + hy
-            abs_z = pz + hz
-            cmd = f"setblock {abs_x} {abs_y} {abs_z} {block}"
-            block_entities.append(make_command_block_entity((hx, hy, hz), cmd))
-
-    block_data = build_block_data(w, height, l, lambda x, y, z: index_layers[y][z][x])
-
-    return Compound({
-        "Version": Int(2),
-        "DataVersion": Int(data_version),
-        "Width": Short(w),
-        "Height": Short(height),
-        "Length": Short(l),
-        "PaletteMax": Int(len(palette)),
-        "Palette": palette,
-        "BlockData": block_data,
-        "BlockEntities": block_entities,
         "Offset": IntArray([0, 0, 0]),
         "Metadata": Compound({}),
     })
