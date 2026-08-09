@@ -10,11 +10,10 @@ example, which is a fundamentally different, better structure:
 that didn't change), spanning the picture's actual width and height --
 not one column per pixel. Consecutive walls are `1 + num_repeaters`
 columns apart along whichever axis is "depth" for the chosen facing
-(X for east/west, Z for north/south), and **the picture's world
-position genuinely advances frame to frame** -- confirmed against your
-exact example: frame 0's wall at depth 0, a relay at depth 1, frame 1's
-wall at depth 2, matching "if there is only 1 tick between frames, the
-next wall would be at 2 ...".
+(X for east/west, Z for north/south). Confirmed against your exact
+example: frame 0's wall at depth 0, a relay at depth 1, frame 1's wall
+at depth 2, matching "if there is only 1 tick between frames, the next
+wall would be at 2 ...".
 
 **The relay only needs a repeater on every OTHER row.** A repeater
 hard-powers the block it's pointed at; that hard-powered block then
@@ -31,20 +30,43 @@ primary-row pattern in a straight line along the depth axis, each
 repeater still on its own quartz support, exactly like an ordinary
 repeater chain.
 
-Repeater facing matches the direction the depth axis is actually
-increasing in (world_depth = corners["depth"] + frame_index × spacing).
-This is my best read of the geometry, not something I can verify without
-an actual placement -- flagging it explicitly since guessing wrong on
-facing has bitten this project before. If the relay doesn't fire when
-you test it, flipping the repeater facing front-to-back is the first
-thing to try.
+**Repeater facing: fixed based on your test.** My first guess (facing =
+the compass direction the depth axis increases in) was backward -- you
+tested it and got the animation playing last-frame-to-first, which
+means the relay WAS firing, just in reverse (confirms the relay/support
+pattern itself is correct, only the direction was wrong). Flipped to
+the opposite compass direction (`repeater[...,facing=west,...]` instead
+of `east`, or `north` instead of `south` for north/south-facing
+pictures). Worth noting this is the second time a facing guess needed
+this exact flip (the earlier per-pixel-column design had the same
+issue) -- a good sign it's a consistent, correctable pattern rather
+than a coincidence, though still empirically-derived rather than
+something rederived from first principles with full confidence.
 
-**Practical side effect worth knowing:** since frames now advance along
-X/Z instead of stacking in Y, there's no meaningful world-height ceiling
-for these tabs anymore (Minecraft's X/Z build limits are enormous). The
-old "world height" warning is gone, replaced with a much softer
-heads-up about total depth-axis extent (mainly about generation/paste
-time for very long animations, not a hard Minecraft limit).
+**STORAGE vs DISPLAY -- corrected after you flagged the structure was
+marching across the world.** I initially had every frame's commands
+target their OWN advancing world position (matching where that frame's
+wall physically sits), so the picture visibly moved 2 blocks over per
+frame instead of repainting in one spot. That conflated two different
+things: the STORAGE structure (the walls/relay above, which correctly
+advances -- that part was already right) and the DISPLAY target (the
+actual on-screen position, which should be fixed). Every frame's
+commands now target the SAME fixed world position regardless of which
+frame's wall physically fired them; only the storage position advances.
+Also added: a pixel that had a real block in the previous frame and
+goes transparent in the current one now gets an explicit
+`setblock ... minecraft:air` (clearing it) instead of being silently
+left alone, and the very first frame always emits an explicit command
+for every pixel (color or air), so the display starts from a clean,
+deterministic state regardless of whatever was at that position before.
+
+**Practical side effect worth knowing:** since the storage structure
+advances along X/Z instead of stacking in Y, there's no meaningful
+world-height ceiling for these tabs anymore (Minecraft's X/Z build
+limits are enormous). The old "world height" warning is gone, replaced
+with a much softer heads-up about total depth-axis extent (mainly about
+generation/paste time for very long animations, not a hard Minecraft
+limit).
 
 Verified end-to-end: reproduced your exact 5-row/101-column example and
 confirmed the relay pattern matches your coordinates precisely; tested
@@ -52,9 +74,15 @@ north-facing (opposite axis mapping from your east-facing example) to
 confirm the width/depth axis swap is correct either way; tested a
 10-tick, 3-repeater delay chain to confirm multi-repeater relays thread
 through the skip rows correctly; confirmed stone-vs-command-block
-substitution and loop_count both still work correctly with the new
-layout; and ran the full pipeline through the actual GIF Command Blocks
-GUI (palette load, GIF load, size, generate, save, reload).
+substitution and loop_count both still work correctly; verified the
+storage structure is completely unaffected by the display-target fix
+(same repeater/quartz/wall positions before and after); tested the
+transparent-to-air and air-to-color transitions explicitly (a pixel that
+disappears gets a real air command, one that reappears gets its color
+back, not silently skipped either way); and ran the full pipeline
+through the actual GIF Command Blocks GUI (palette load, GIF load, size,
+generate, save, reload) confirming every command targets one fixed
+position per pixel across all frames.
 
 This is used by both GIF Command Blocks and Video (both call the same
 `generate_gif_command_block_schem`), so this one fix applies to both

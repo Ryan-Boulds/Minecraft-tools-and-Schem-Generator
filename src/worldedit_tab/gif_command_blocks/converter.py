@@ -40,21 +40,40 @@ each one's hard-powered output directly feeds the next repeater behind
 it, no special handling needed beyond "each one needs its own quartz
 support directly underneath."
 
-Repeater facing matches the direction the depth axis is actually
-increasing in (world_depth = corners["depth"] + frame_index * spacing),
-since a repeater has to physically face the direction it's relaying
-power in. This is a best-effort read of the geometry, not something I
-can verify without a real placement -- if the relay doesn't fire in
-your test, flipping CIRCUIT_FACING front-to-back is the first thing to
-try.
+STORAGE vs DISPLAY -- these are two different things, and it's worth
+being explicit about which is which after getting this backward once
+already. The command blocks and repeaters described above (X=0, X=1,
+X=2, ...) are the STORAGE structure -- where the redstone circuitry and
+the frame data physically live. The DISPLAY target -- the actual world
+position the picture appears at -- is a SEPARATE, FIXED location
+(corners["depth"], the same for every frame). Every frame's command
+blocks setblock to that one fixed spot, overwriting whatever the
+previous frame put there; only the storage position (which command
+block fires when) advances with the frame index. A pixel that had a
+real block in the previous frame and is transparent in the current one
+gets an explicit `setblock <target> minecraft:air` (clearing it), not
+silently skipped -- and the very first frame always emits an explicit
+command for every non-transparent pixel (and air for transparent ones),
+regardless of whatever happened to already be at that world position
+before the schematic was ever placed.
 
-The picture's display position now genuinely advances through the world
-frame to frame (unlike an earlier version of this that kept a single
-fixed target) -- which also means, unlike a per-pixel vertical stack,
-there's no meaningful world-height ceiling here: long animations grow
-along X/Z (Minecraft's build limits there are enormous) rather than Y
-(capped at ~384 blocks), which is why this redesign scales so much
-better for GIFs and especially for video.
+Repeater facing: my first guess here (facing = the compass direction
+the depth axis increases in) was backward -- confirmed by you testing
+it and getting the animation playing last-frame-to-first, meaning the
+relay was firing correctly, just in reverse. Flipped to the opposite
+compass direction (north/west instead of south/east) below. Worth
+noting this is the SECOND time a facing guess needed this exact flip
+(the earlier per-pixel-column design had the same issue), which is a
+good sign it's a consistent, fixable pattern rather than a coincidence
+-- but still empirically-derived rather than something I can rederive
+from first principles with full confidence.
+
+Unlike a per-pixel vertical stack, there's no meaningful world-height
+ceiling here regardless of the storage-vs-display distinction above:
+long animations grow the STORAGE structure along X/Z (Minecraft's build
+limits there are enormous) rather than Y (capped at ~384 blocks), which
+is why this design scales so much better for GIFs and especially for
+video.
 """
 
 from PIL import Image, ImageSequence, ImageOps
@@ -209,7 +228,7 @@ def generate_gif_command_block_schem(frame_block_grids, facing: str, corners: di
     # relaying power in, which is the direction world_depth increases.
     # Matches an unrotated paste (local axes = world axes). Flip this if
     # the relay doesn't fire in testing -- see the module docstring.
-    circuit_facing = "south" if is_ns else "east"
+    circuit_facing = "north" if is_ns else "west"
 
     cb_state = command_block_state(facing)
     palette = Compound({AIR_BLOCK: Int(0), STONE_BLOCK: Int(1), cb_state: Int(2), QUARTZ_BLOCK: Int(3)})
@@ -232,6 +251,10 @@ def generate_gif_command_block_schem(frame_block_grids, facing: str, corners: di
     # for free (see module docstring).
     primary_rows = set(range(0, target_h, 2))
 
+    _UNSET = object()  # sentinel: "no previous frame" -- distinct from None
+                        # (None means "transparent this frame", a real value
+                        # worth diffing against on later frames)
+
     prev_grid = None
     for f in range(total_frame_steps):
         actual_frame_idx = f % num_source_frames
@@ -242,27 +265,35 @@ def generate_gif_command_block_schem(frame_block_grids, facing: str, corners: di
             hy = target_h - 1 - row_i  # image row 0 (top) -> top of the wall
             ly = hy + ly_offset
             for col_i, block in enumerate(row):
-                prev_block = prev_grid[row_i][col_i] if prev_grid is not None else None
-                is_new = block is not None and (f == 0 or block != prev_block)
+                prev_block = prev_grid[row_i][col_i] if prev_grid is not None else _UNSET
+                changed = (prev_block is _UNSET) or (block != prev_block)
 
                 if is_ns:
                     hx, hz = col_i, frame_depth_local
                 else:
                     hx, hz = frame_depth_local, col_i
 
-                if is_new:
+                if changed:
+                    # The command's TARGET is always the same fixed world
+                    # position, frame after frame -- only the physical
+                    # STORAGE position (hx, ly, hz) advances with the
+                    # frame. This is what makes the picture repaint in
+                    # place instead of marching across the world. A pixel
+                    # that went from a real block to transparent gets an
+                    # explicit air command (clearing it), not silently
+                    # skipped.
                     index_layers[ly][hz][hx] = 2  # command block
                     world_h = minH + col_i
                     world_y = minY + hy
-                    world_depth = depth0 + frame_depth_local
                     if is_ns:
-                        abs_x, abs_y, abs_z = world_h, world_y, world_depth
+                        abs_x, abs_y, abs_z = world_h, world_y, depth0
                     else:
-                        abs_x, abs_y, abs_z = world_depth, world_y, world_h
-                    cmd = f"setblock {abs_x} {abs_y} {abs_z} {block}"
+                        abs_x, abs_y, abs_z = depth0, world_y, world_h
+                    target_block = block if block is not None else AIR_BLOCK
+                    cmd = f"setblock {abs_x} {abs_y} {abs_z} {target_block}"
                     block_entities.append(make_command_block_entity((hx, ly, hz), cmd))
                 else:
-                    index_layers[ly][hz][hx] = 1  # stone filler
+                    index_layers[ly][hz][hx] = 1  # stone filler -- nothing changed, no command needed
 
                 if f < total_frame_steps - 1 and hy in primary_rows:
                     for r, delay in enumerate(repeater_delays):

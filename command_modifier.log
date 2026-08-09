@@ -15540,3 +15540,95 @@
 2026-08-08 14:38:44,783 - DEBUG - Always on top set to: True
 2026-08-08 14:39:05,184 - DEBUG - Importing GifImagePlugin
 2026-08-08 14:39:55,064 - DEBUG - Schematic saved to C:/Users/ryant/AppData/Roaming/ModrinthApp/profiles/Redstone Optimized Mod Pack for Modrinth App 1.0.0/config/worldedit/schematics/pixel-mario.schem
+2026-08-08 22:15:08,805 - DEBUG - Logging initialized
+2026-08-08 22:15:08,864 - INFO - F12 keyboard hook initialized
+2026-08-08 22:15:08,889 - DEBUG - Stored config for widget Label at row 2: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 0, 'row': 2, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:15:08,891 - DEBUG - Stored config for widget Checkbutton at row 2: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 2, 'row': 2, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:15:08,891 - DEBUG - Stored config for widget Entry at row 2: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 1, 'row': 2, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:15:08,891 - DEBUG - Stored config for widget Label at row 8: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 0, 'row': 8, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 5, 'sticky': 'w'}
+2026-08-08 22:15:08,891 - DEBUG - Stored config for widget Checkbutton at row 8: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 2, 'row': 8, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 5, 'sticky': 'w'}
+2026-08-08 22:15:08,891 - DEBUG - Stored config for widget Label at row 9: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 0, 'row': 9, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:15:08,891 - DEBUG - Stored config for widget Entry at row 9: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 1, 'row': 9, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:15:08,892 - DEBUG - Stored config for widget Label at row 10: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 0, 'row': 10, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:15:08,892 - DEBUG - Stored config for widget Entry at row 10: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 1, 'row': 10, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:15:08,892 - DEBUG - Stored config for widget Label at row 11: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 0, 'row': 11, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:15:08,892 - DEBUG - Stored config for widget Entry at row 11: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 1, 'row': 11, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:15:08,892 - DEBUG - Stored config for widget Label at row 12: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 0, 'row': 12, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 5, 'sticky': 'w'}
+2026-08-08 22:15:08,892 - DEBUG - Stored config for widget Checkbutton at row 12: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 2, 'row': 12, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 5, 'sticky': 'w'}
+2026-08-08 22:15:08,892 - DEBUG - Stored config for widget Label at row 13: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 0, 'row': 13, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:15:08,892 - DEBUG - Stored config for widget Entry at row 13: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 1, 'row': 13, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:15:08,892 - DEBUG - Stored config for widget Label at row 14: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 0, 'row': 14, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:15:08,892 - DEBUG - Stored config for widget Entry at row 14: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 1, 'row': 14, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:15:08,892 - DEBUG - Stored config for widget Label at row 15: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 0, 'row': 15, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:15:08,892 - DEBUG - Stored config for widget Entry at row 15: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 1, 'row': 15, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:15:08,893 - DEBUG - Starting UI update: command_type=laser, is_laser=True
+2026-08-08 22:15:08,893 - DEBUG - Gridded widget Label at row 2
+2026-08-08 22:15:08,893 - DEBUG - Gridded widget Checkbutton at row 2
+2026-08-08 22:15:08,893 - DEBUG - Gridded widget Entry at row 2
+2026-08-08 22:15:08,893 - DEBUG - Gridded widget Label at row 8
+2026-08-08 22:15:08,893 - DEBUG - Gridded widget Checkbutton at row 8
+2026-08-08 22:15:08,893 - DEBUG - Gridded widget Label at row 9
+2026-08-08 22:15:08,893 - DEBUG - Gridded widget Entry at row 9
+2026-08-08 22:15:08,893 - DEBUG - Gridded widget Label at row 10
+2026-08-08 22:15:08,893 - DEBUG - Gridded widget Entry at row 10
+2026-08-08 22:15:08,894 - DEBUG - Gridded widget Label at row 11
+2026-08-08 22:15:08,894 - DEBUG - Gridded widget Entry at row 11
+2026-08-08 22:15:08,894 - DEBUG - Removed widget Label at row 12
+2026-08-08 22:15:08,894 - DEBUG - Removed widget Checkbutton at row 12
+2026-08-08 22:15:08,894 - DEBUG - Removed widget Label at row 13
+2026-08-08 22:15:08,894 - DEBUG - Removed widget Entry at row 13
+2026-08-08 22:15:08,894 - DEBUG - Removed widget Label at row 14
+2026-08-08 22:15:08,894 - DEBUG - Removed widget Entry at row 14
+2026-08-08 22:15:08,894 - DEBUG - Removed widget Label at row 15
+2026-08-08 22:15:08,894 - DEBUG - Removed widget Entry at row 15
+2026-08-08 22:15:08,983 - DEBUG - Canvas updated after UI change
+2026-08-08 22:15:59,598 - DEBUG - Always on top set to: True
+2026-08-08 22:16:19,575 - DEBUG - Importing GifImagePlugin
+2026-08-08 22:16:42,300 - DEBUG - Schematic saved to C:/Users/ryant/AppData/Roaming/ModrinthApp/profiles/Redstone Optimized Mod Pack for Modrinth App 1.0.0/config/worldedit/schematics/pixel-mario.schem
+2026-08-08 22:17:05,595 - DEBUG - Schematic saved to C:/Users/ryant/AppData/Roaming/ModrinthApp/profiles/Redstone Optimized Mod Pack for Modrinth App 1.0.0/config/worldedit/schematics/pixel-mario.schem
+2026-08-08 22:31:51,841 - DEBUG - Logging initialized
+2026-08-08 22:31:51,901 - INFO - F12 keyboard hook initialized
+2026-08-08 22:31:51,931 - DEBUG - Stored config for widget Label at row 2: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 0, 'row': 2, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:31:51,931 - DEBUG - Stored config for widget Checkbutton at row 2: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 2, 'row': 2, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:31:51,933 - DEBUG - Stored config for widget Entry at row 2: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 1, 'row': 2, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:31:51,933 - DEBUG - Stored config for widget Label at row 8: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 0, 'row': 8, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 5, 'sticky': 'w'}
+2026-08-08 22:31:51,933 - DEBUG - Stored config for widget Checkbutton at row 8: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 2, 'row': 8, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 5, 'sticky': 'w'}
+2026-08-08 22:31:51,933 - DEBUG - Stored config for widget Label at row 9: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 0, 'row': 9, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:31:51,933 - DEBUG - Stored config for widget Entry at row 9: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 1, 'row': 9, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:31:51,933 - DEBUG - Stored config for widget Label at row 10: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 0, 'row': 10, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:31:51,935 - DEBUG - Stored config for widget Entry at row 10: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 1, 'row': 10, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:31:51,935 - DEBUG - Stored config for widget Label at row 11: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 0, 'row': 11, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:31:51,935 - DEBUG - Stored config for widget Entry at row 11: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 1, 'row': 11, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:31:51,935 - DEBUG - Stored config for widget Label at row 12: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 0, 'row': 12, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 5, 'sticky': 'w'}
+2026-08-08 22:31:51,935 - DEBUG - Stored config for widget Checkbutton at row 12: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 2, 'row': 12, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 5, 'sticky': 'w'}
+2026-08-08 22:31:51,935 - DEBUG - Stored config for widget Label at row 13: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 0, 'row': 13, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:31:51,935 - DEBUG - Stored config for widget Entry at row 13: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 1, 'row': 13, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:31:51,935 - DEBUG - Stored config for widget Label at row 14: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 0, 'row': 14, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:31:51,935 - DEBUG - Stored config for widget Entry at row 14: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 1, 'row': 14, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:31:51,935 - DEBUG - Stored config for widget Label at row 15: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 0, 'row': 15, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:31:51,935 - DEBUG - Stored config for widget Entry at row 15: {'in': <tkinter.ttk.Frame object .!notebook.!frame.!notebook.!frame4.!canvas.!frame>, 'column': 1, 'row': 15, 'columnspan': 1, 'rowspan': 1, 'ipadx': 0, 'ipady': 0, 'padx': 0, 'pady': 2, 'sticky': 'w'}
+2026-08-08 22:31:51,936 - DEBUG - Starting UI update: command_type=laser, is_laser=True
+2026-08-08 22:31:51,936 - DEBUG - Gridded widget Label at row 2
+2026-08-08 22:31:51,936 - DEBUG - Gridded widget Checkbutton at row 2
+2026-08-08 22:31:51,936 - DEBUG - Gridded widget Entry at row 2
+2026-08-08 22:31:51,936 - DEBUG - Gridded widget Label at row 8
+2026-08-08 22:31:51,936 - DEBUG - Gridded widget Checkbutton at row 8
+2026-08-08 22:31:51,936 - DEBUG - Gridded widget Label at row 9
+2026-08-08 22:31:51,936 - DEBUG - Gridded widget Entry at row 9
+2026-08-08 22:31:51,936 - DEBUG - Gridded widget Label at row 10
+2026-08-08 22:31:51,936 - DEBUG - Gridded widget Entry at row 10
+2026-08-08 22:31:51,936 - DEBUG - Gridded widget Label at row 11
+2026-08-08 22:31:51,936 - DEBUG - Gridded widget Entry at row 11
+2026-08-08 22:31:51,936 - DEBUG - Removed widget Label at row 12
+2026-08-08 22:31:51,937 - DEBUG - Removed widget Checkbutton at row 12
+2026-08-08 22:31:51,937 - DEBUG - Removed widget Label at row 13
+2026-08-08 22:31:51,937 - DEBUG - Removed widget Entry at row 13
+2026-08-08 22:31:51,937 - DEBUG - Removed widget Label at row 14
+2026-08-08 22:31:51,937 - DEBUG - Removed widget Entry at row 14
+2026-08-08 22:31:51,937 - DEBUG - Removed widget Label at row 15
+2026-08-08 22:31:51,937 - DEBUG - Removed widget Entry at row 15
+2026-08-08 22:31:52,057 - DEBUG - Canvas updated after UI change
+2026-08-08 22:31:54,467 - DEBUG - Always on top set to: True
+2026-08-08 22:32:14,778 - DEBUG - Importing GifImagePlugin
+2026-08-08 22:32:39,127 - DEBUG - Schematic saved to C:/Users/ryant/AppData/Roaming/ModrinthApp/profiles/Redstone Optimized Mod Pack for Modrinth App 1.0.0/config/worldedit/schematics/pixel-mario.schem
+2026-08-08 22:34:52,184 - DEBUG - Schematic saved to C:/Users/ryant/AppData/Roaming/ModrinthApp/profiles/Redstone Optimized Mod Pack for Modrinth App 1.0.0/config/worldedit/schematics/pixel-mario.schem

@@ -35,13 +35,14 @@ def create_video_command_blocks_subframe(parent, gui):
 
     tk.Label(frame,
              text="Each frame is a full wall of command blocks (and stone, for pixels that didn't change),\n"
-                  "with a repeater relay between one wall and the next -- the picture's position genuinely\n"
-                  "advances through the world one frame at a time, along whichever axis is \"depth\" for the\n"
-                  "chosen facing. Long, high-fps videos are fully supported (frames are streamed one at a\n"
-                  "time during both steps below, never all held in memory at once) -- a 60fps, 60-second\n"
-                  "video is 3600 frames, and the structure grows along that depth axis accordingly. Unlike\n"
-                  "an earlier version of this, that's not a world-height concern (X/Z have enormous headroom\n"
-                  "in Minecraft) -- just something to keep an eye on for how long generation/pasting takes.",
+                  "with a repeater relay between one wall and the next. That relay STRUCTURE advances along\n"
+                  "whichever axis is \"depth\" for the chosen facing, but every frame's commands target the\n"
+                  "SAME fixed on-screen position -- the picture repaints in place. Long, high-fps videos are\n"
+                  "fully supported (frames are streamed one at a time during both steps below, never all\n"
+                  "held in memory at once) -- a 60fps, 60-second video is 3600 frames, and the STORAGE\n"
+                  "structure grows along the depth axis accordingly. That's not a world-height concern (X/Z\n"
+                  "have enormous headroom in Minecraft) -- just something to keep an eye on for how long\n"
+                  "generation/pasting takes.",
              bg='#f0f0f0', fg='#555555', justify="left").grid(row=1, column=0, sticky="w", padx=20, pady=(0, 8))
 
     # ================= STEP 1: EXTRACT FRAMES =================
@@ -359,7 +360,7 @@ def create_video_command_blocks_subframe(parent, gui):
             refresh_preview_widget(preview_img, state["orig_w"], state["orig_h"])
             return
         refresh_preview_widget(preview_img, c["width_blocks"], c["height_blocks"])
-        lines = [f"Picture size: {c['width_blocks']} x {c['height_blocks']} blocks   (frame 0 depth: {c['depth']}, advances from there)",
+        lines = [f"Picture size: {c['width_blocks']} x {c['height_blocks']} blocks   (fixed display depth: {c['depth']})",
                  f"Bottom-Left: {c['bottom_left']}   Top-Right: {c['top_right']}"]
         if c.get("depth_mismatch"):
             lines.append("\u26a0 Corner A/B disagree on depth -- using Corner A's value.")
