@@ -74,7 +74,23 @@ def create_image_command_blocks_subframe(parent, gui):
                 pass
         _update_corners_preview()
 
-    preview_container, refresh_preview_widget = create_preview_widget(frame, on_rotate=_do_rotate)
+    def _load_palette_preview():
+        if not state["palette"]:
+            messagebox.showwarning("No palette", "Load a block palette JSON first.")
+            return
+        if not state["image"]:
+            messagebox.showwarning("No image", "Load an image first.")
+            return
+        corners = _compute_corners_or_none()
+        if corners is None:
+            messagebox.showwarning("Invalid coordinates", "Check that all coordinate/size fields are numbers.")
+            return
+        pixel_grid = build_pixel_grid(state["image"], corners["width_blocks"], corners["height_blocks"])
+        block_grid = match_palette(pixel_grid, state["palette"])
+        set_palette_preview(block_grid, state["palette"])
+
+    preview_container, refresh_preview_widget, set_palette_preview = create_preview_widget(
+        frame, on_rotate=_do_rotate, on_load_palette_preview=_load_palette_preview)
     preview_container.grid(row=2, column=1, rowspan=5, sticky="n", padx=(10, 10), pady=4)
     frame.columnconfigure(1, weight=0)
 
@@ -134,7 +150,7 @@ def create_image_command_blocks_subframe(parent, gui):
     anchor_xyz_row.pack(fill="x", pady=2)
     tk.Label(anchor_xyz_row, text="Anchor X Y Z:", bg='#f0f0f0').pack(side="left")
     anchor_x_var = tk.StringVar(value="0")
-    anchor_y_var = tk.StringVar(value="64")
+    anchor_y_var = tk.StringVar(value="-62")
     anchor_z_var = tk.StringVar(value="0")
     tk.Entry(anchor_xyz_row, textvariable=anchor_x_var, width=8).pack(side="left", padx=4)
     tk.Entry(anchor_xyz_row, textvariable=anchor_y_var, width=8).pack(side="left", padx=4)
@@ -147,7 +163,7 @@ def create_image_command_blocks_subframe(parent, gui):
     a_row = tk.Frame(stretch_frame, bg='#f0f0f0')
     a_row.pack(fill="x", pady=2)
     tk.Label(a_row, text="Corner A  X Y Z:", bg='#f0f0f0').pack(side="left")
-    a_x_var, a_y_var, a_z_var = tk.StringVar(value="0"), tk.StringVar(value="64"), tk.StringVar(value="0")
+    a_x_var, a_y_var, a_z_var = tk.StringVar(value="0"), tk.StringVar(value="-62"), tk.StringVar(value="0")
     tk.Entry(a_row, textvariable=a_x_var, width=8).pack(side="left", padx=4)
     tk.Entry(a_row, textvariable=a_y_var, width=8).pack(side="left", padx=4)
     tk.Entry(a_row, textvariable=a_z_var, width=8).pack(side="left", padx=4)
@@ -155,7 +171,7 @@ def create_image_command_blocks_subframe(parent, gui):
     b_row = tk.Frame(stretch_frame, bg='#f0f0f0')
     b_row.pack(fill="x", pady=2)
     tk.Label(b_row, text="Corner B (diagonal) X Y Z:", bg='#f0f0f0').pack(side="left")
-    b_x_var, b_y_var, b_z_var = tk.StringVar(value="31"), tk.StringVar(value="95"), tk.StringVar(value="0")
+    b_x_var, b_y_var, b_z_var = tk.StringVar(value="31"), tk.StringVar(value="-31"), tk.StringVar(value="0")
     tk.Entry(b_row, textvariable=b_x_var, width=8).pack(side="left", padx=4)
     tk.Entry(b_row, textvariable=b_y_var, width=8).pack(side="left", padx=4)
     tk.Entry(b_row, textvariable=b_z_var, width=8).pack(side="left", padx=4)

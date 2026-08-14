@@ -1,5 +1,62 @@
 # worldedit_tab rebuild
 
+## New: Stage tab (in progress) -- non-flat concert-screen mapping
+
+New level-2 tab, "Stage", sibling to Media Creator and Setup Tools, for
+the concert-stage use case: multiple screens that aren't flat rectangles
+(curved, stepped, angled panels), each scanned from something you
+already built, then arranged into one shared layout that a video/GIF
+gets mapped across -- one command block generation pass covering every
+screen at once.
+
+**The core idea, and why it doesn't need new redstone:** the existing
+GIF/Video design already separates the STORAGE structure (a flat wall
+of repeaters and command blocks, doing the timing) from the DISPLAY
+target (the actual world position each command's `setblock` points at).
+For a flat picture, every pixel shares one display depth. For a stage
+screen, each pixel's display target is instead looked up from a scan --
+the wall itself stays exactly as flat and boring as before; only the
+coordinates baked into each command get creative. Your instruction not
+to worry about the command blocks matching the stage's physical shape,
+just keeping them powered together, is exactly what this exploits.
+
+Three planned sub-tabs, built in this order:
+
+**Scan Screens (done, verified):** loads a .schem of a panel you already
+built and captured with WorldEdit, and for every (row, col) of its own
+width x height, scans along the depth axis (which axis depends on a
+chosen facing, same north/south/east/west convention as the rest of
+this project) for the front-most non-air block -- working identically
+whether the panel is a flat wall or a curved/stepped one, since there's
+no flatness assumption anywhere in the scan itself. Combines that with
+a world anchor you provide (where the panel's local (0,0,0) actually
+sits right now) to produce a "screen object" file: every pixel's real
+world position, saved under a name you choose. A coverage-grid preview
+(green = block found, gray = empty) helps catch a wrong facing or scan
+direction immediately, since those usually produce an obviously broken
+or empty scan rather than a subtly wrong one.
+
+Verified: exact-position tests against synthetic schematics for a flat
+panel, a curved/stepped panel (varying depth per column, simulating a
+real stage screen), a panel with a gap (missing block correctly comes
+back empty, not a false position), and a multi-layer-thick structure
+confirming the front/back direction toggle picks the correct surface.
+Full pipeline re-run through the actual GUI end to end (load schematic,
+scan, save), with every one of 32 pixels in a curved test panel checked
+against its exact expected world coordinate afterward.
+
+**Arrange Stage (not started):** load saved screen objects, drag each
+one to position it on a shared canvas -- purely in logical pixel space,
+not moving anything in the world; each screen's own real position stays
+exactly what its scan found. Save the layout as a stage map.
+
+**Generate (not started):** load a stage map plus a video/GIF, and
+produce the schem file(s) -- reusing the same wall/relay/layer-splitting/
+fill-trigger design already built and proven for the GIF and Video tabs,
+just with a per-pixel target lookup instead of one shared formula.
+Capturing where you'll be standing to `//paste` (for the `/fill`
+layer-trigger coordinates) carries over from that same design.
+
 ## Fix #12 (the big one): GIF/Video command blocks rebuilt from scratch -- shared walls + relay, not per-pixel columns
 
 The earlier design put one independent vertical repeater/quartz column
@@ -88,6 +145,34 @@ This is used by both GIF Command Blocks and Video (both call the same
 `generate_gif_command_block_schem`), so this one fix applies to both
 tabs.
 
+## Addition: lead-in and trail-out relay segments
+
+Small request, same shared function, so it applies to both tabs again.
+Previously the structure started directly with frame 0's wall and ended
+right after the last frame's relay. Now there's one more relay segment
+*before* frame 0 (same repeater/quartz pattern as any inter-frame relay)
+and one more *after* the last frame:
+
+```
+[lead-in relay] [frame 0] [relay] [frame 1] [relay] ... [frame N] [trail-out relay]
+```
+
+Power the lead-in end to start the animation (instead of powering frame
+0's wall directly) -- and the trail-out end gives you a clean tap point
+past the very last frame, for wiring into something else to detect "the
+animation just finished." Both segments use the exact same
+`repeater_delays` list (same tick counts, same primary-row-only
+pattern) as the inter-frame relays, so they scale correctly with
+however many repeaters a given tick count needs.
+
+Verified: a 1-repeater, 2-frame case shows exactly `[lead-in][frame0]
+[relay][frame1][trail-out]` (5 columns total, matching); a 2-repeater,
+3-row case confirmed both primary rows get proper lead-in/trail-out
+coverage, not just one; and the fixed-target/air-clearing behavior from
+the previous fix is untouched by this (still verified working through
+the actual GUI). The depth-extent estimate in both tabs' UI now
+accounts for the two extra segments too.
+
 ## New dependency: OpenCV (for the Video tab)
 
 `video_command_blocks` uses OpenCV to decode video files:
@@ -161,7 +246,7 @@ content are completely unchanged.
 just open in the right folder. `common/recent_paths.py` gained
 `remember_file()`/`get_initial_file_args()` alongside the existing
 folder-level `remember()`/`get_dir()` -- every "Browse" for a palette
-JSON (all three image-based tabs) and the Resource Pack Scanner's Save/
+JSON (every image/GIF/video-based tab) and the Resource Pack Scanner's Save/
 Load Palette buttons use this now. Falls back to the old folder-only
 behavior if the exact file's been moved or deleted since. Verified: a
 second dialog open correctly shows `initialfile` set to the previously
@@ -186,27 +271,161 @@ text field (standard Tk Entry behavior once fill/expand isn't fighting
 it). Verified an entry's requested width is now identical before and
 after typing/pasting a much longer path.
 
-## New: photo preview with rotate, on all three image-based tabs
+## New: Video extraction gets both an fps control and a resolution cap
 
-**Image to Pixel Art**, **Image Command Blocks**, and **GIF Command
-Blocks** now show a live preview beside the controls: the loaded
-image/first GIF frame, resized (smoothly, no attempt to look blocky or
-match the real block palette -- just a quick visual sanity check) to
-whatever width:height ratio your current settings imply. Change the
-width/height fields, toggle aspect lock, or switch Image/GIF Command
-Blocks' stretch-to-fit-two-corners mode, and the preview updates live to
-show exactly how squished or stretched the result will be before you
-commit to a conversion.
+Direct fix for "a 1-minute 1080p 60fps video had 2+GB of images and
+took forever, even at 15fps/100 blocks wide." Two independent, additive
+levers in Step 1 (Extract Frames), both optional:
 
-A **Rotate 90°** button cycles the source image/GIF frames a quarter
-turn at a time (all frames rotate together for GIF Command Blocks).
-This isn't just a display trick -- the rotated image is what actually
-gets used for the conversion. Verified this with a real generate: a
-90°-rotated 4x2 image (red left column, white elsewhere) correctly
-produced a 2x4 output with red on top, not just a relabeled preview.
+**"Extract at fps"** -- instead of writing every single decoded frame to
+disk and only using a fraction of them at generate time, extraction now
+only writes as many frames as you'll actually use. A 60fps source at 15
+fps keeps 1 in 4 frames -- 900 frames instead of 3600 for a 1-minute
+clip. Selecting the video now also probes it immediately (fast --
+container metadata only, no frame decoding) and shows its real fps and
+frame count, so you know what you're working with before choosing a
+target. Honest caveat: every source frame still has to be *decoded*
+either way (video codecs don't generally support reliably skipping
+undecoded frames), so this saves the PNG-encode-and-disk-write cost for
+discarded frames, not the decode time itself -- still a real, large
+reduction in both disk usage and wall-clock time, just not literally
+4x faster.
 
-Shared implementation in `common/image_preview.py`, reused by all three
-tabs.
+**"Max resolution height"** -- downscales each frame (aspect-ratio
+preserved, never upscales a smaller source) before writing it, hard-
+capped at 384 (the field rejects anything higher). Smaller frames are
+both less disk space and much faster to read back during Generate,
+since that step has to load and decode every kept frame from disk.
+Combines with the fps control -- both together on the earlier example
+(15fps + 100px height on an 800x600/60fps source) cut a 60-frame,
+full-resolution extraction down to 15 small frames.
+
+Verified: extraction with target_fps=15 on a real 60fps test video
+wrote exactly 15 files, not 60; a max_height=384 test on a 1920x1080
+source correctly produced 683x384 frames (aspect preserved); a value
+over 384 is correctly rejected; a source already smaller than the
+requested max_height is correctly left alone (no upscaling); and the
+fps sidecar metadata correctly reflects the *reduced* rate (15, not
+60) so Step 2's timing plan reads the right number automatically. Ran
+the full pipeline through the actual GUI with both levers set together
+and confirmed the resulting files on disk match exactly.
+
+## New: auto-split long GIF/Video animations into vertically-stacked layers for render distance
+
+Direct fix for "it ran out of render distance" on long animations. GIF
+and Video tabs both get a new **"Max blocks per layer"** field (blank =
+unlimited, unchanged behavior). When set, an animation that would
+exceed that depth is automatically split across multiple
+vertically-stacked layers (2 air blocks apart, same X/Z footprint) --
+still ONE schematic file.
+
+**This went through two different designs.** The first was a real
+physical redstone bridge -- a diagonal quartz+dust staircase climbing
+from one layer up into the next. It worked (verified via real generated
+schematics, decoded and checked cell-by-cell for collisions), but you
+asked for something simpler: skip the bridge entirely. **Each
+non-final layer now ends in one command block instead of a trail-out
+relay** -- sitting at the bottom row, touching the last wall the same
+way any relay continuation already does (so it gets soft-powered the
+same way), running a single `/fill ... minecraft:redstone_block` that
+permanently powers the next layer's lead-in relay across its full width
+and height in one command. The last layer keeps a normal trail-out
+relay, unchanged.
+
+A permanent power source instead of a momentary pulse doesn't cause any
+problem: every downstream command block only cares about the moment it
+transitions from unpowered to powered, and the repeater chain still
+produces that same cascade of transitions, at the same relative delays,
+whether the original trigger was a button press or a block that never
+turns off. It just means that particular lead-in can't be manually
+re-fired later without clearing those blocks first, which doesn't
+matter since it only needs to fire once, automatically, when the
+previous layer finishes.
+
+Because the fill's target has to be baked in as absolute world
+coordinates, both tabs now also have a **"Standing position when you
+//paste (X Y Z)"** field -- only needed (and required) when "Max blocks
+per layer" is set. This assumes a standard `//paste` with no rotation,
+so local (0,0,0) of the schematic lands exactly there.
+
+This new design also removed the previous version's biggest limitation:
+since there's no dust bridge anymore, there's no dust-range constraint
+either -- the earlier 12-row picture-height cap is gone. Every layer is
+now also fully independent (own lead-in relay, own frames, own trigger
+or trail-out) using the exact same depth-axis footprint every time, with
+no need for the previous design's buffer reservations or direction
+alternation at all.
+
+Verified: single-file (no limit) output is still byte-for-byte identical
+to your already-tested worked example -- this change doesn't touch that
+path. The new multi-layer design was tested across multiple picture
+sizes, both facing orientations, multi-tick delays, and looping; every
+generated schematic decoded and checked cell-by-cell for collisions
+(zero found); every fill command's absolute coordinates hand-verified
+against the math; confirmed the final layer still uses a normal
+trail-out relay; and the full path re-run end-to-end through the real
+GIF and Video tab GUIs, including a forced multi-layer split, output
+files decoded and confirmed collision-free with correctly-computed fill
+commands.
+
+## Change: default Y coordinate is -62, everywhere
+
+Every anchor/corner Y field across every tab (Conv to Command Blocks'
+player position, and the anchor/Corner A/Corner B fields in Image
+Command Blocks, GIF Command Blocks, and Video) now defaults to -62
+instead of 64. Corner B's Y default (which represents anchor-Y plus a
+height offset, not an independent value) was shifted by the same
+amount as the anchor's own change, so the default stretch-mode height
+span stays exactly what it was before -- Image Command Blocks'
+Corner B moved from 95 to -31 (still 31 above the anchor, matching its
+default 32-block height), GIF/Video's from 79 to -47 (still 15 above,
+matching their default 16-block height). Verified all four tabs show
+-62 (and the correctly-shifted Corner B values) through the actual GUI.
+
+## New: dual-mode preview (stretched + palette-matched 2D render) with zoom/pan, on all four image-based tabs
+
+**Image to Pixel Art**, **Image Command Blocks**, **GIF Command
+Blocks**, and **Video** all now have a preview widget beside the
+controls with two modes, a radio button to switch between them:
+
+- **Stretched** (the original preview) -- the loaded image/first frame,
+  smoothly resized to whatever width:height ratio your current settings
+  imply, live-updating as you edit. A quick visual sanity check, not a
+  preview of the real output.
+- **2D Render** -- the ACTUAL matched palette colors, one flat color per
+  pixel cell, exactly what the real conversion would place -- built from
+  each pixel's nearest match in the loaded palette JSON's own stored RGB
+  values, not the original photo's colors. This is deliberately **not**
+  automatic -- matching every pixel against the palette is real work for
+  a big image, so it only happens when you click **Load 2D Preview**,
+  using whatever palette/size/rotation/corners you currently have set.
+
+The 2D Render mode supports **mouse-wheel zoom** and **click-drag pan**
+(both no-ops in Stretched mode) -- useful since seeing individual pixel
+colors clearly usually means zooming in well past the small preview
+box's native size. It opens already zoomed to roughly fill the preview
+box rather than showing a tiny image at 1x.
+
+A **Rotate 90°** button (works in both modes) cycles the source image/
+frames a quarter turn at a time (all frames rotate together for GIF/
+Video). This isn't just a display trick -- the rotated image is what
+actually gets used for the conversion. Verified this with a real
+generate: a 90°-rotated 4x2 image (red left column, white elsewhere)
+correctly produced a 2x4 output with red on top, not just a relabeled
+preview.
+
+Verified end-to-end on all four tabs: loading a palette + image/GIF/
+video through the real Browse buttons, clicking Load 2D Preview and
+confirming it renders (with the auto-zoom level shown correctly),
+switching back to Stretched mode and confirming that still works,
+and exercising zoom (mouse wheel) and pan (drag) with synthetic events
+to confirm the displayed zoom level and viewport actually change.
+
+Shared implementation in `common/image_preview.py`, reused by all four
+tabs -- Image Command Blocks, GIF Command Blocks, and Video derive
+their preview dimensions from the current corner placement (fixed-size
+or stretch-to-fit); Image to Pixel Art uses its width/height fields
+directly. GIF and Video both preview against their first frame only.
 
 ## Fix #11: portrait photos loaded sideways
 

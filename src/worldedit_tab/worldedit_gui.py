@@ -8,14 +8,17 @@ from .image_to_pixelart.gui import create_image_to_pixelart_subframe
 from .image_command_blocks.gui import create_image_command_blocks_subframe
 from .gif_command_blocks.gui import create_gif_command_blocks_subframe
 from .video_command_blocks.gui import create_video_command_blocks_subframe
+from .stage.scan_gui import create_scan_subframe
+from .stage.arrange_gui import create_arrange_subframe
+from .stage.generate_gui import create_stage_generate_subframe
 
 
 def create_worldedit_schematic_gui(frame, gui):
-    """WorldEdit Schematic Tab - a top-level Notebook with two tabs:
+    """WorldEdit Schematic Tab - a top-level Notebook with three tabs:
        Media Creator (Image to Pixel Art, Image Command Blocks, GIF
-       Command Blocks, Video) and Setup Tools (Conv to cmd blocks,
-       Resource Pack Scanner) -- each holding its own nested Notebook
-       of subtabs."""
+       Command Blocks, Video), Setup Tools (Conv to cmd blocks,
+       Resource Pack Scanner), and Stage (Scan Screens, Arrange Stage,
+       Generate) -- each holding its own nested Notebook of subtabs."""
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(0, weight=1)
 
@@ -24,8 +27,10 @@ def create_worldedit_schematic_gui(frame, gui):
 
     media_frame = ttk.Frame(top_notebook)
     setup_frame = ttk.Frame(top_notebook)
+    stage_frame = ttk.Frame(top_notebook)
     top_notebook.add(media_frame, text="Media Creator")
     top_notebook.add(setup_frame, text="Setup Tools")
+    top_notebook.add(stage_frame, text="Stage")
 
     media_notebook = _nested_notebook(media_frame)
     media_tabs = [
@@ -44,6 +49,15 @@ def create_worldedit_schematic_gui(frame, gui):
     ]
     for label, tab_frame in setup_tabs:
         setup_notebook.add(tab_frame, text=label)
+
+    stage_notebook = _nested_notebook(stage_frame)
+    stage_tabs = [
+        ("Scan Screens", _scrollable(stage_notebook, lambda parent: create_scan_subframe(parent, gui))),
+        ("Arrange Stage", _scrollable(stage_notebook, lambda parent: create_arrange_subframe(parent, gui))),
+        ("Generate", _scrollable(stage_notebook, lambda parent: create_stage_generate_subframe(parent, gui))),
+    ]
+    for label, tab_frame in stage_tabs:
+        stage_notebook.add(tab_frame, text=label)
 
 
 def _nested_notebook(parent):

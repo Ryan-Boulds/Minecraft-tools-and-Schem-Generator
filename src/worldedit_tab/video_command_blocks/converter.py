@@ -15,7 +15,11 @@ gigabytes -- completely impractical. So:
      each frame straight to disk as a numbered PNG, one at a time. Never
      holds more than a single frame in memory. Writes a small JSON
      sidecar recording the source fps, so step 2 can read the original
-     timing back automatically.
+     timing back automatically. Accepts a target_fps so you only extract
+     as many frames as you'll actually use -- a 60fps, 1-minute 1080p
+     video is 3600 frames (2GB+) if you extract everything, but only 900
+     at 15fps. This is the main fix for extraction being slow and huge:
+     don't write 4x more frames to disk than you need.
 
   2. scan_frame_folder() + stream_frame_block_grids() -- step 2 doesn't
      load any image data up front either: scan_frame_folder() just
@@ -26,7 +30,9 @@ gigabytes -- completely impractical. So:
      resolution frame, regardless of whether the video is 10 frames or
      10,000. The resulting per-frame block grids are tiny (e.g. a 32x32
      grid of block-id strings) and cheap to keep all of them in a list
-     for the final generation step.
+     for the final generation step. Extracting fewer frames up front
+     (via target_fps above) also directly speeds this step up, since
+     there are fewer files to read and decode.
 
 A REAL PRACTICAL LIMIT WORTH KNOWING: none of the above is about
 Minecraft build size -- that's governed by world height (see GIF
@@ -52,17 +58,61 @@ from ..gif_command_blocks.converter import (
 )
 
 METADATA_FILENAME = "video_frames_meta.json"
+MAX_RESIZE_HEIGHT = 384  # hard cap -- block art never needs more resolution than this
 
 
-def extract_video_frames(video_path: str, output_folder: str, frame_skip: int = 1,
+def probe_video(video_path: str):
+    """Quickly reads a video's fps and frame count -- container metadata
+    only, no frame decoding -- so this is fast even for large files.
+    Used to show the source fps before extraction and to size a target-
+    fps extraction correctly. Returns (fps, frame_count, duration_seconds).
+    frame_count/duration may be 0 if the container doesn't report a count
+    up front (rare, but some formats don't)."""
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise ValueError(f"Could not open video file: {video_path}")
+    try:
+        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        duration = frame_count / fps if fps > 0 else 0.0
+        return fps, frame_count, duration
+    finally:
+        cap.release()
+
+
+def extract_video_frames(video_path: str, output_folder: str, target_fps: float = None,
+                          frame_skip: int = 1, max_height: int = None,
                           progress_callback=None):
     """Decode `video_path` into numbered PNGs (frame_000001.png, ...) in
     `output_folder`, one frame written to disk at a time.
 
-    frame_skip: keep 1 out of every `frame_skip` source frames (1 = every
-    frame) -- a disk-space/extraction-time knob, separate from the
-    timing-driven frame skipping Generate From Folder applies later on
-    top of whatever gets written here.
+    target_fps: if given (and > 0), only writes as many frames as needed
+    to hit roughly this frame rate -- e.g. target_fps=15 on a 60fps
+    source keeps 1 out of every 4 frames. This is one lever for the
+    "2GB of images, took forever" problem: a 60fps, 1-minute 1080p video
+    is 3600 frames if you extract everything, but only 900 at 15fps --
+    a real reduction in both disk usage and how long extraction takes
+    (though every source frame still has to be DECODED either way --
+    video codecs don't generally support skipping undecoded frames
+    reliably, so this saves the PNG-encode-and-write work for discarded
+    frames, not the decode work itself).
+
+    frame_skip: a lower-level "keep 1 out of every N" knob, used if
+    target_fps isn't given (defaults to 1 = every frame). Ignored if
+    target_fps is provided -- target_fps computes its own frame_skip
+    from the source's actual fps (via probe_video-equivalent logic
+    here) and takes precedence.
+
+    max_height: the OTHER lever -- if given, each written frame is
+    downscaled (preserving aspect ratio, never upscaled) so its height
+    doesn't exceed this many pixels. E.g. max_height=384 on a 1080p
+    (1920x1080) source writes 683x384 frames instead of 1920x1080 ones.
+    This is independent of target_fps -- one cuts how many frames get
+    written, the other cuts how big each one is -- and they combine.
+    Capped at MAX_RESIZE_HEIGHT (384): raises ValueError above that,
+    since block art never needs more resolution than this -- the
+    eventual output is always downsized further to a target block
+    width/height anyway.
 
     progress_callback(frames_written, frames_seen, total_estimate) is
     called periodically if provided (total_estimate may be 0 if the
@@ -72,6 +122,9 @@ def extract_video_frames(video_path: str, output_folder: str, frame_skip: int = 
     sidecar into output_folder so scan_frame_folder() can read the
     original timing back automatically.
     """
+    if max_height is not None and max_height > MAX_RESIZE_HEIGHT:
+        raise ValueError(f"max_height can't exceed {MAX_RESIZE_HEIGHT}.")
+
     os.makedirs(output_folder, exist_ok=True)
 
     cap = cv2.VideoCapture(video_path)
@@ -81,6 +134,9 @@ def extract_video_frames(video_path: str, output_folder: str, frame_skip: int = 
     try:
         source_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
         total_estimate = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+
+        if target_fps is not None and target_fps > 0:
+            frame_skip = max(1, round(source_fps / target_fps))
 
         frames_seen = 0
         frames_written = 0
@@ -95,6 +151,9 @@ def extract_video_frames(video_path: str, output_folder: str, frame_skip: int = 
                 frames_written += 1
                 rgb_frame = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2RGB)
                 im = Image.fromarray(rgb_frame)
+                if max_height is not None and im.height > max_height:
+                    new_w = max(1, round(im.width * (max_height / im.height)))
+                    im = im.resize((new_w, max_height), Image.LANCZOS)
                 out_path = os.path.join(output_folder, f"frame_{frames_written:06d}.png")
                 im.save(out_path)
 
@@ -110,6 +169,7 @@ def extract_video_frames(video_path: str, output_folder: str, frame_skip: int = 
         "frame_skip": frame_skip,
         "effective_fps": effective_fps,
         "frame_count": frames_written,
+        "max_height": max_height,
     }
     with open(os.path.join(output_folder, METADATA_FILENAME), "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2)

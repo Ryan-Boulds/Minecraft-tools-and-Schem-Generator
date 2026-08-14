@@ -1,6 +1,5 @@
 # worldedit_tab/video_command_blocks/gui.py
 
-import os
 import queue
 import threading
 import tkinter as tk
@@ -10,11 +9,12 @@ from ..common.schem_io import save_schematic
 from ..common.recent_paths import get_dir, remember, remember_file, get_initial_file_args
 from ..common.image_preview import create_preview_widget
 from ..resource_pack_scanner.scanner import load_palette
-from ..image_to_pixelart.converter import locked_dimension
+from ..image_to_pixelart.converter import build_pixel_grid, match_palette, locked_dimension
 from ..image_command_blocks.converter import CORNER_NAMES, compute_corners_fixed_size, compute_corners_stretch
 from .converter import (
     extract_video_frames, scan_frame_folder, load_first_frame, stream_frame_block_grids,
-    compute_frame_plan, select_kept_frames, generate_gif_command_block_schem,
+    compute_frame_plan, select_kept_frames, generate_gif_command_block_schem, probe_video,
+    MAX_RESIZE_HEIGHT,
 )
 
 LARGE_STRUCTURE_WARNING = 2000  # heads-up threshold for depth-axis extent; not a hard Minecraft limit like world height was
@@ -35,13 +35,15 @@ def create_video_command_blocks_subframe(parent, gui):
 
     tk.Label(frame,
              text="Each frame is a full wall of command blocks (and stone, for pixels that didn't change),\n"
-                  "with a repeater relay between one wall and the next. That relay STRUCTURE advances along\n"
-                  "whichever axis is \"depth\" for the chosen facing, but every frame's commands target the\n"
-                  "SAME fixed on-screen position -- the picture repaints in place. Long, high-fps videos are\n"
-                  "fully supported (frames are streamed one at a time during both steps below, never all\n"
-                  "held in memory at once) -- a 60fps, 60-second video is 3600 frames, and the STORAGE\n"
-                  "structure grows along the depth axis accordingly. That's not a world-height concern (X/Z\n"
-                  "have enormous headroom in Minecraft) -- just something to keep an eye on for how long\n"
+                  "with a repeater relay between one wall and the next -- plus one more relay segment before\n"
+                  "frame 0 (power that end to start the animation) and one more after the last frame (a tap\n"
+                  "point for detecting when it's finished). That relay STRUCTURE advances along whichever\n"
+                  "axis is \"depth\" for the chosen facing, but every frame's commands target the SAME fixed\n"
+                  "on-screen position -- the picture repaints in place. Long, high-fps videos are fully\n"
+                  "supported (frames are streamed one at a time during both steps below, never all held in\n"
+                  "memory at once) -- a 60fps, 60-second video is 3600 frames, and the STORAGE structure\n"
+                  "grows along the depth axis accordingly. That's not a world-height concern (X/Z have\n"
+                  "enormous headroom in Minecraft) -- just something to keep an eye on for how long\n"
                   "generation/pasting takes.",
              bg='#f0f0f0', fg='#555555', justify="left").grid(row=1, column=0, sticky="w", padx=20, pady=(0, 8))
 
@@ -56,10 +58,15 @@ def create_video_command_blocks_subframe(parent, gui):
     video_path_var = tk.StringVar()
     tk.Entry(video_frame, textvariable=video_path_var, width=46).pack(side="left", padx=8)
     tk.Button(video_frame, text="Browse", bg='#2196F3', fg='white',
-              command=lambda: _browse_video(video_path_var)).pack(side="left")
+              command=lambda: _browse_video(video_path_var, extract_fps_var, source_info_var)
+              ).pack(side="left")
+
+    source_info_var = tk.StringVar(value="")
+    tk.Label(frame, textvariable=source_info_var, bg='#f0f0f0', fg='#777777').grid(
+        row=4, column=0, sticky="w", padx=20, pady=(0, 2))
 
     outdir_frame = tk.Frame(frame, bg='#f0f0f0')
-    outdir_frame.grid(row=4, column=0, sticky="ew", padx=20, pady=2)
+    outdir_frame.grid(row=5, column=0, sticky="ew", padx=20, pady=2)
     tk.Label(outdir_frame, text="Output Frame Folder:", bg='#f0f0f0').pack(side="left")
     outdir_var = tk.StringVar()
     tk.Entry(outdir_frame, textvariable=outdir_var, width=46).pack(side="left", padx=8)
@@ -67,14 +74,26 @@ def create_video_command_blocks_subframe(parent, gui):
               command=lambda: _browse_outdir(outdir_var)).pack(side="left")
 
     skip_frame = tk.Frame(frame, bg='#f0f0f0')
-    skip_frame.grid(row=5, column=0, sticky="ew", padx=20, pady=2)
-    tk.Label(skip_frame, text="Extract every Nth frame (1 = every frame):", bg='#f0f0f0').pack(side="left")
-    frame_skip_var = tk.StringVar(value="1")
-    tk.Entry(skip_frame, textvariable=frame_skip_var, width=5).pack(side="left", padx=(4, 0))
+    skip_frame.grid(row=6, column=0, sticky="ew", padx=20, pady=2)
+    tk.Label(skip_frame, text="Extract at fps (blank = every source frame):", bg='#f0f0f0').pack(side="left")
+    extract_fps_var = tk.StringVar(value="")
+    tk.Entry(skip_frame, textvariable=extract_fps_var, width=6).pack(side="left", padx=(4, 12))
+    tk.Label(skip_frame, text="Lower than the source fps skips the frames you won't use, "
+                              "saving disk space and time.", bg='#f0f0f0', fg='#777777').pack(side="left")
+
+    res_frame = tk.Frame(frame, bg='#f0f0f0')
+    res_frame.grid(row=7, column=0, sticky="ew", padx=20, pady=2)
+    tk.Label(res_frame, text=f"Max resolution height (blank = original size, max {MAX_RESIZE_HEIGHT}):",
+              bg='#f0f0f0').pack(side="left")
+    max_height_var = tk.StringVar(value="")
+    tk.Entry(res_frame, textvariable=max_height_var, width=6).pack(side="left", padx=(4, 12))
+    tk.Label(res_frame, text="Downscales each frame before writing it -- smaller frames are much\n"
+                              "faster to read back during Generate too.",
+              bg='#f0f0f0', fg='#777777', justify="left").pack(side="left")
 
     extract_status_var = tk.StringVar(value="No video extracted yet.")
     tk.Label(frame, textvariable=extract_status_var, bg='#f0f0f0', fg='#333333').grid(
-        row=6, column=0, sticky="w", padx=20, pady=(2, 4))
+        row=8, column=0, sticky="w", padx=20, pady=(2, 4))
 
     def do_extract():
         video_path = video_path_var.get().strip()
@@ -85,11 +104,29 @@ def create_video_command_blocks_subframe(parent, gui):
         if not out_dir:
             messagebox.showwarning("No output folder", "Choose an output folder for the extracted frames first.")
             return
-        try:
-            frame_skip = max(1, int(frame_skip_var.get()))
-        except ValueError:
-            messagebox.showwarning("Invalid value", "'Extract every Nth frame' must be a positive integer.")
-            return
+        target_fps = None
+        fps_text = extract_fps_var.get().strip()
+        if fps_text:
+            try:
+                target_fps = float(fps_text)
+                if target_fps <= 0:
+                    raise ValueError
+            except ValueError:
+                messagebox.showwarning("Invalid value", "'Extract at fps' must be a positive number, or blank.")
+                return
+        max_height = None
+        height_text = max_height_var.get().strip()
+        if height_text:
+            try:
+                max_height = int(height_text)
+                if max_height <= 0:
+                    raise ValueError
+            except ValueError:
+                messagebox.showwarning("Invalid value", "'Max resolution height' must be a positive integer, or blank.")
+                return
+            if max_height > MAX_RESIZE_HEIGHT:
+                messagebox.showwarning("Too large", f"'Max resolution height' can't exceed {MAX_RESIZE_HEIGHT}.")
+                return
         if state["extracting"]:
             return
 
@@ -108,8 +145,8 @@ def create_video_command_blocks_subframe(parent, gui):
 
         def worker():
             try:
-                count, fps = extract_video_frames(video_path, out_dir, frame_skip=frame_skip,
-                                                   progress_callback=progress)
+                count, fps = extract_video_frames(video_path, out_dir, target_fps=target_fps,
+                                                   max_height=max_height, progress_callback=progress)
             except Exception as e:
                 result_queue.put(("error", str(e)))
                 return
@@ -153,16 +190,16 @@ def create_video_command_blocks_subframe(parent, gui):
         frame.after(100, _poll)
 
     tk.Button(frame, text="Extract Frames", command=do_extract,
-              bg='#673AB7', fg='white', width=18).grid(row=7, column=0, sticky="w", padx=20, pady=(0, 10))
+              bg='#673AB7', fg='white', width=18).grid(row=9, column=0, sticky="w", padx=20, pady=(0, 10))
 
-    ttk.Separator(frame, orient="horizontal").grid(row=8, column=0, sticky="ew", padx=20, pady=6)
+    ttk.Separator(frame, orient="horizontal").grid(row=10, column=0, sticky="ew", padx=20, pady=6)
 
     # ================= STEP 2: GENERATE FROM FOLDER =================
     tk.Label(frame, text="Step 2: Generate From Frame Folder",
-             font=("Arial", 11, "bold"), bg='#f0f0f0').grid(row=9, column=0, sticky="w", padx=20, pady=(4, 2))
+             font=("Arial", 11, "bold"), bg='#f0f0f0').grid(row=11, column=0, sticky="w", padx=20, pady=(4, 2))
 
     pal_frame = tk.Frame(frame, bg='#f0f0f0')
-    pal_frame.grid(row=10, column=0, sticky="ew", padx=20, pady=2)
+    pal_frame.grid(row=12, column=0, sticky="ew", padx=20, pady=2)
     tk.Label(pal_frame, text="Block Palette JSON:", bg='#f0f0f0').pack(side="left")
     palette_path_var = tk.StringVar()
     tk.Entry(pal_frame, textvariable=palette_path_var, width=46).pack(side="left", padx=8)
@@ -170,7 +207,7 @@ def create_video_command_blocks_subframe(parent, gui):
               command=lambda: _browse_palette(palette_path_var, state, status_var)).pack(side="left")
 
     ff_frame = tk.Frame(frame, bg='#f0f0f0')
-    ff_frame.grid(row=11, column=0, sticky="ew", padx=20, pady=2)
+    ff_frame.grid(row=13, column=0, sticky="ew", padx=20, pady=2)
     tk.Label(ff_frame, text="Frame Folder:", bg='#f0f0f0').pack(side="left")
     frame_folder_var = tk.StringVar()
     tk.Entry(ff_frame, textvariable=frame_folder_var, width=46).pack(side="left", padx=8)
@@ -179,7 +216,7 @@ def create_video_command_blocks_subframe(parent, gui):
               ).pack(side="left")
 
     manual_fps_frame = tk.Frame(frame, bg='#f0f0f0')
-    manual_fps_frame.grid(row=12, column=0, sticky="ew", padx=20, pady=2)
+    manual_fps_frame.grid(row=14, column=0, sticky="ew", padx=20, pady=2)
     tk.Label(manual_fps_frame, text="Source fps (auto-filled if extracted by this tool; enter manually otherwise):",
              bg='#f0f0f0').pack(side="left")
     native_fps_var = tk.StringVar(value="")
@@ -212,8 +249,24 @@ def create_video_command_blocks_subframe(parent, gui):
                 pass
         _update_corners_preview()
 
-    preview_container, refresh_preview_widget = create_preview_widget(frame, on_rotate=_do_rotate)
-    preview_container.grid(row=10, column=1, rowspan=7, sticky="n", padx=(10, 10), pady=4)
+    def _load_palette_preview():
+        if not state["palette"]:
+            messagebox.showwarning("No palette", "Load a block palette JSON first.")
+            return
+        if not state["first_frame"]:
+            messagebox.showwarning("No frames", "Load a frame folder first.")
+            return
+        corners = _current_corners()
+        if corners is None:
+            messagebox.showwarning("Invalid coordinates", "Check that all coordinate/size fields are numbers.")
+            return
+        pixel_grid = build_pixel_grid(state["first_frame"], corners["width_blocks"], corners["height_blocks"])
+        block_grid = match_palette(pixel_grid, state["palette"])
+        set_palette_preview(block_grid, state["palette"])
+
+    preview_container, refresh_preview_widget, set_palette_preview = create_preview_widget(
+        frame, on_rotate=_do_rotate, on_load_palette_preview=_load_palette_preview)
+    preview_container.grid(row=12, column=1, rowspan=7, sticky="n", padx=(10, 10), pady=4)
     frame.columnconfigure(1, weight=0)
 
     def _apply_rotation_to_first_frame():
@@ -251,7 +304,7 @@ def create_video_command_blocks_subframe(parent, gui):
 
     # --- size / facing ---
     size_frame = tk.Frame(frame, bg='#f0f0f0')
-    size_frame.grid(row=13, column=0, sticky="ew", padx=20, pady=(10, 4))
+    size_frame.grid(row=15, column=0, sticky="ew", padx=20, pady=(10, 4))
     tk.Label(size_frame, text="Width (blocks):", bg='#f0f0f0').pack(side="left")
     w_var = tk.StringVar(value="16")
     tk.Entry(size_frame, textvariable=w_var, width=6).pack(side="left", padx=(4, 16))
@@ -268,7 +321,7 @@ def create_video_command_blocks_subframe(parent, gui):
     # --- corner placement (same model as Image Command Blocks) ---
     mode_var = tk.StringVar(value="fixed")
     mode_frame = tk.Frame(frame, bg='#f0f0f0')
-    mode_frame.grid(row=14, column=0, sticky="ew", padx=20, pady=(10, 4))
+    mode_frame.grid(row=16, column=0, sticky="ew", padx=20, pady=(10, 4))
     tk.Radiobutton(mode_frame, text="Fixed size \u2014 place by one corner (scale locked)",
                    variable=mode_var, value="fixed", bg='#f0f0f0',
                    command=lambda: _switch_mode()).pack(anchor="w")
@@ -277,7 +330,7 @@ def create_video_command_blocks_subframe(parent, gui):
                    command=lambda: _switch_mode()).pack(anchor="w")
 
     fixed_frame = tk.Frame(frame, bg='#f0f0f0')
-    fixed_frame.grid(row=15, column=0, sticky="ew", padx=20, pady=4)
+    fixed_frame.grid(row=17, column=0, sticky="ew", padx=20, pady=4)
     anchor_row = tk.Frame(fixed_frame, bg='#f0f0f0')
     anchor_row.pack(fill="x", pady=2)
     tk.Label(anchor_row, text="Anchor corner:", bg='#f0f0f0').pack(side="left")
@@ -287,24 +340,24 @@ def create_video_command_blocks_subframe(parent, gui):
     anchor_xyz_row = tk.Frame(fixed_frame, bg='#f0f0f0')
     anchor_xyz_row.pack(fill="x", pady=2)
     tk.Label(anchor_xyz_row, text="Anchor X Y Z:", bg='#f0f0f0').pack(side="left")
-    anchor_x_var, anchor_y_var, anchor_z_var = tk.StringVar(value="0"), tk.StringVar(value="64"), tk.StringVar(value="0")
+    anchor_x_var, anchor_y_var, anchor_z_var = tk.StringVar(value="0"), tk.StringVar(value="-62"), tk.StringVar(value="0")
     tk.Entry(anchor_xyz_row, textvariable=anchor_x_var, width=8).pack(side="left", padx=4)
     tk.Entry(anchor_xyz_row, textvariable=anchor_y_var, width=8).pack(side="left", padx=4)
     tk.Entry(anchor_xyz_row, textvariable=anchor_z_var, width=8).pack(side="left", padx=4)
 
     stretch_frame = tk.Frame(frame, bg='#f0f0f0')
-    stretch_frame.grid(row=15, column=0, sticky="ew", padx=20, pady=4)
+    stretch_frame.grid(row=17, column=0, sticky="ew", padx=20, pady=4)
     a_row = tk.Frame(stretch_frame, bg='#f0f0f0')
     a_row.pack(fill="x", pady=2)
     tk.Label(a_row, text="Corner A  X Y Z:", bg='#f0f0f0').pack(side="left")
-    a_x_var, a_y_var, a_z_var = tk.StringVar(value="0"), tk.StringVar(value="64"), tk.StringVar(value="0")
+    a_x_var, a_y_var, a_z_var = tk.StringVar(value="0"), tk.StringVar(value="-62"), tk.StringVar(value="0")
     tk.Entry(a_row, textvariable=a_x_var, width=8).pack(side="left", padx=4)
     tk.Entry(a_row, textvariable=a_y_var, width=8).pack(side="left", padx=4)
     tk.Entry(a_row, textvariable=a_z_var, width=8).pack(side="left", padx=4)
     b_row = tk.Frame(stretch_frame, bg='#f0f0f0')
     b_row.pack(fill="x", pady=2)
     tk.Label(b_row, text="Corner B (diagonal) X Y Z:", bg='#f0f0f0').pack(side="left")
-    b_x_var, b_y_var, b_z_var = tk.StringVar(value="15"), tk.StringVar(value="79"), tk.StringVar(value="0")
+    b_x_var, b_y_var, b_z_var = tk.StringVar(value="15"), tk.StringVar(value="-47"), tk.StringVar(value="0")
     tk.Entry(b_row, textvariable=b_x_var, width=8).pack(side="left", padx=4)
     tk.Entry(b_row, textvariable=b_y_var, width=8).pack(side="left", padx=4)
     tk.Entry(b_row, textvariable=b_z_var, width=8).pack(side="left", padx=4)
@@ -329,7 +382,7 @@ def create_video_command_blocks_subframe(parent, gui):
         _update_corners_preview()
 
     corners_preview_frame = tk.Frame(frame, bg='#eef1f5', bd=1, relief="solid")
-    corners_preview_frame.grid(row=16, column=0, sticky="ew", padx=20, pady=(10, 6))
+    corners_preview_frame.grid(row=18, column=0, sticky="ew", padx=20, pady=(10, 6))
     corners_preview_var = tk.StringVar(value="Corners will appear here once size/coordinates are set.")
     tk.Label(corners_preview_frame, textvariable=corners_preview_var, bg='#eef1f5', justify="left",
              font=("Consolas", 10), anchor="w").pack(fill="x", padx=10, pady=8)
@@ -368,7 +421,7 @@ def create_video_command_blocks_subframe(parent, gui):
 
     # --- timing controls ---
     timing_frame = tk.Frame(frame, bg='#f0f0f0')
-    timing_frame.grid(row=17, column=0, sticky="ew", padx=20, pady=(10, 4))
+    timing_frame.grid(row=19, column=0, sticky="ew", padx=20, pady=(10, 4))
     tk.Label(timing_frame, text="Server tick rate (ticks/sec):", bg='#f0f0f0').pack(side="left")
     tick_rate_var = tk.StringVar(value="20")
     tk.Entry(timing_frame, textvariable=tick_rate_var, width=6).pack(side="left", padx=(4, 16))
@@ -384,10 +437,30 @@ def create_video_command_blocks_subframe(parent, gui):
 
     tk.Label(frame, text="Target playback fps defaults to the detected source fps (preserves original timing\n"
                           "regardless of tick rate) -- change it for custom speed.",
-             bg='#f0f0f0', fg='#777777', justify="left").grid(row=18, column=0, sticky="w", padx=20)
+             bg='#f0f0f0', fg='#777777', justify="left").grid(row=20, column=0, sticky="w", padx=20)
+
+    layer_frame = tk.Frame(frame, bg='#f0f0f0')
+    layer_frame.grid(row=21, column=0, sticky="ew", padx=20, pady=2)
+    tk.Label(layer_frame, text="Max blocks per layer (blank = unlimited):", bg='#f0f0f0').pack(side="left")
+    max_depth_var = tk.StringVar(value="")
+    tk.Entry(layer_frame, textvariable=max_depth_var, width=8).pack(side="left", padx=(4, 12))
+    tk.Label(layer_frame, text="Splits a too-long animation into layers, stacked 2 blocks\n"
+                                "apart -- e.g. 512 for a 32-chunk render distance.",
+              bg='#f0f0f0', fg='#777777', justify="left").pack(side="left")
+
+    standing_frame = tk.Frame(frame, bg='#f0f0f0')
+    standing_frame.grid(row=22, column=0, sticky="ew", padx=20, pady=2)
+    tk.Label(standing_frame, text="Standing position when you //paste (X Y Z):", bg='#f0f0f0').pack(side="left")
+    stand_x_var, stand_y_var, stand_z_var = tk.StringVar(value=""), tk.StringVar(value=""), tk.StringVar(value="")
+    tk.Entry(standing_frame, textvariable=stand_x_var, width=6).pack(side="left", padx=(4, 2))
+    tk.Entry(standing_frame, textvariable=stand_y_var, width=6).pack(side="left", padx=2)
+    tk.Entry(standing_frame, textvariable=stand_z_var, width=6).pack(side="left", padx=(2, 12))
+    tk.Label(standing_frame, text="Only needed with a layer limit above -- the fill command that\n"
+                                   "starts each next layer is baked in as absolute coordinates.",
+              bg='#f0f0f0', fg='#777777', justify="left").pack(side="left")
 
     frame_plan_frame = tk.Frame(frame, bg='#eef1f5', bd=1, relief="solid")
-    frame_plan_frame.grid(row=19, column=0, sticky="ew", padx=20, pady=(6, 6))
+    frame_plan_frame.grid(row=23, column=0, sticky="ew", padx=20, pady=(6, 6))
     frame_plan_var = tk.StringVar(value="Load a frame folder to see its frame rate and timing plan.")
     tk.Label(frame_plan_frame, textvariable=frame_plan_var, bg='#eef1f5', justify="left",
              font=("Consolas", 10), anchor="w").pack(fill="x", padx=10, pady=8)
@@ -411,23 +484,59 @@ def create_video_command_blocks_subframe(parent, gui):
         total_frames = len(state["frame_paths"])
         kept = len(range(0, total_frames, plan["keep_every_n"]))
         total_steps = kept * max(1, loop_count)
-        est_depth = (total_steps - 1) * plan["segment_length"] + 1
+        est_depth = 2 * plan["num_repeaters_per_gap"] + (total_steps - 1) * plan["segment_length"] + 1
         warn = ""
         if est_depth > LARGE_STRUCTURE_WARNING:
             warn = (f"\n\u26a0 ~{est_depth} blocks along the depth axis -- generation and pasting a "
                      f"structure this large may be slow.")
+        layer_note = ""
+        max_depth_text = max_depth_var.get().strip()
+        if max_depth_text:
+            try:
+                max_depth = int(max_depth_text)
+                valid_int = max_depth > 0
+            except ValueError:
+                max_depth = None
+                valid_int = False
+            if not valid_int:
+                layer_note = "\n\u26a0 'Max blocks per layer' must be a positive integer, or blank."
+            else:
+                num_repeaters = plan["num_repeaters_per_gap"]
+                segment_length = plan["segment_length"]
+                lead_trail = num_repeaters
+
+                def depth_needed(n):
+                    return lead_trail + (n - 1) * segment_length + 1 + lead_trail
+
+                min_needed = depth_needed(1)
+                if max_depth < min_needed:
+                    layer_note = f"\n\u26a0 Max blocks per layer ({max_depth}) is too small (needs at least {min_needed})."
+                else:
+                    num_layers_est = 0
+                    start = 0
+                    while start < total_steps:
+                        n = 1
+                        while start + n < total_steps and depth_needed(n + 1) <= max_depth:
+                            n += 1
+                        start += n
+                        num_layers_est += 1
+                    if num_layers_est > 1:
+                        layer_note = (f"\n{num_layers_est} layer(s) needed at {max_depth} blocks/layer, stacked "
+                                      f"vertically -- set your standing position below.")
+                    else:
+                        layer_note = f"\nFits in a single layer at {max_depth} blocks/layer -- no splitting needed."
         frame_plan_var.set(
             f"Source: {total_frames} frames at {plan['native_fps']:.2f} fps.   "
             f"Circuit: {plan['ticks_per_gap']} redstone ticks/gap "
             f"({plan['num_repeaters_per_gap']} repeater(s)) -> {plan['achieved_fps']:.2f} fps.\n"
             f"Keeping every {plan['keep_every_n']} frame(s) -> {kept} frame(s) x {max(1, loop_count)} "
-            f"loop(s) = {total_steps} step(s), ~{est_depth} blocks along the depth axis.{warn}"
+            f"loop(s) = {total_steps} step(s), ~{est_depth} blocks along the depth axis.{warn}{layer_note}"
         )
 
     for v in (w_var, h_var, anchor_x_var, anchor_y_var, anchor_z_var, a_x_var, a_y_var, a_z_var,
               b_x_var, b_y_var, b_z_var, stretch_lock_var, stretch_base_var, anchor_corner_var, facing_var):
         v.trace_add("write", _update_corners_preview)
-    for v in (tick_rate_var, target_fps_var, loop_count_var, show_all_var):
+    for v in (tick_rate_var, target_fps_var, loop_count_var, show_all_var, max_depth_var):
         v.trace_add("write", _update_frame_plan)
 
     def _on_w(*_):
@@ -464,10 +573,10 @@ def create_video_command_blocks_subframe(parent, gui):
     # --- status / output ---
     status_var = tk.StringVar(value="Load a palette and a frame folder to begin.")
     tk.Label(frame, textvariable=status_var, bg='#f0f0f0', fg='#333333').grid(
-        row=20, column=0, sticky="w", padx=20, pady=(4, 0))
+        row=24, column=0, sticky="w", padx=20, pady=(4, 0))
     text_out = tk.Text(frame, height=8, font=("Consolas", 10), wrap="word", bg="#fdfdfd")
-    text_out.grid(row=21, column=0, sticky="nsew", padx=20, pady=8)
-    frame.rowconfigure(21, weight=1)
+    text_out.grid(row=25, column=0, sticky="nsew", padx=20, pady=8)
+    frame.rowconfigure(25, weight=1)
 
     def do_generate():
         if not state["palette"]:
@@ -496,6 +605,28 @@ def create_video_command_blocks_subframe(parent, gui):
             messagebox.showwarning("Invalid timing", str(e))
             return
 
+        max_depth = None
+        max_depth_text = max_depth_var.get().strip()
+        if max_depth_text:
+            try:
+                max_depth = int(max_depth_text)
+                if max_depth <= 0:
+                    raise ValueError
+            except ValueError:
+                messagebox.showwarning("Invalid value", "'Max blocks per layer' must be a positive integer, or blank.")
+                return
+
+        standing_pos = None
+        if max_depth is not None:
+            try:
+                standing_pos = (int(stand_x_var.get()), int(stand_y_var.get()), int(stand_z_var.get()))
+            except ValueError:
+                messagebox.showwarning(
+                    "Standing position needed",
+                    "With 'Max blocks per layer' set, enter the X Y Z you'll be standing at when you "
+                    "run //paste -- the fill command connecting each layer needs it baked in.")
+                return
+
         out_path = filedialog.asksaveasfilename(
             defaultextension=".schem", filetypes=[("Schematic", "*.schem")],
             title="Save animated command block schematic", initialdir=get_dir("schem_output"))
@@ -522,7 +653,8 @@ def create_video_command_blocks_subframe(parent, gui):
                     rotation=state["rotation"], progress_callback=progress))
                 new_root = generate_gif_command_block_schem(
                     frame_block_grids, facing, corners,
-                    ticks_per_gap=plan["ticks_per_gap"], loop_count=loop_count)
+                    ticks_per_gap=plan["ticks_per_gap"], loop_count=loop_count,
+                    max_depth_per_layer=max_depth, standing_pos=standing_pos)
                 save_schematic(new_root, out_path)
             except Exception as e:
                 result_queue.put(("error", str(e)))
@@ -544,7 +676,11 @@ def create_video_command_blocks_subframe(parent, gui):
                                     f"Frames kept: {num_kept} of {len(state['frame_paths'])}, x{loop_count} loop(s)\n"
                                     f"Achieved playback: {plan['achieved_fps']:.2f} fps "
                                     f"({plan['ticks_per_gap']} redstone ticks, {plan['num_repeaters_per_gap']} repeater(s)/gap)\n"
-                                    f"Bottom-Left: {corners['bottom_left']}   Top-Right: {corners['top_right']}\n")
+                                    f"Bottom-Left: {corners['bottom_left']}   Top-Right: {corners['top_right']}\n"
+                                    + (f"Split across layers stacked {target_h + 3} blocks apart. Paste standing "
+                                       f"exactly at {standing_pos}, no rotation -- power the lead-in relay at the "
+                                       f"bottom layer to start; the rest triggers automatically.\n"
+                                       if max_depth else ""))
             if gui is not None and hasattr(gui, "print_to_text"):
                 gui.print_to_text(f"Animated command block schematic saved to {out_path}", "normal")
 
@@ -571,7 +707,7 @@ def create_video_command_blocks_subframe(parent, gui):
         frame.after(100, _poll)
 
     btn_frame = tk.Frame(frame, bg='#f0f0f0')
-    btn_frame.grid(row=22, column=0, sticky="ew", padx=20, pady=(0, 10))
+    btn_frame.grid(row=26, column=0, sticky="ew", padx=20, pady=(0, 10))
     tk.Button(btn_frame, text="Generate Animated Command Block Schematic", command=do_generate,
               bg='#4CAF50', fg='white', width=38).pack(side="left")
 
@@ -579,13 +715,21 @@ def create_video_command_blocks_subframe(parent, gui):
     return frame
 
 
-def _browse_video(var):
+def _browse_video(var, extract_fps_var, source_info_var):
     path = filedialog.askopenfilename(
         filetypes=[("Video files", "*.mp4 *.mov *.avi *.mkv *.webm"), ("All files", "*.*")],
         initialdir=get_dir("video_file"))
-    if path:
-        var.set(path)
-        remember("video_file", path)
+    if not path:
+        return
+    var.set(path)
+    remember("video_file", path)
+    try:
+        fps, frame_count, duration = probe_video(path)
+        extra = f", ~{duration:.1f}s" if duration else ""
+        source_info_var.set(f"Source: {fps:.2f} fps, {frame_count} frame(s){extra}. "
+                              f"Leave \"Extract at fps\" blank to keep all of them.")
+    except Exception as e:
+        source_info_var.set(f"Could not read video info: {e}")
 
 
 def _browse_outdir(var):

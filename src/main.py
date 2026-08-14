@@ -299,7 +299,7 @@ class CommandModifierGUI:
         elif current_tab == "Change Block":
             from change_block_tab.modifier import modify_clipboard_command
             return modify_clipboard_command(self)
-        elif current_tab == "Generate End Beam":
+        elif current_tab == "Generate End Beam":        
             from generate_end_beam_tab.modifier import generate_end_beam_commands
             return generate_end_beam_commands(self)
         elif current_tab == "Rename Tag/Group":

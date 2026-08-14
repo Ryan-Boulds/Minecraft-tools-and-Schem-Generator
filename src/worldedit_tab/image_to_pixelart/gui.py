@@ -81,7 +81,26 @@ def create_image_to_pixelart_subframe(parent, gui):
                 pass
         _refresh_preview()
 
-    preview_container, refresh_preview_widget = create_preview_widget(frame, on_rotate=_do_rotate)
+    def _load_palette_preview():
+        if not state["palette"]:
+            messagebox.showwarning("No palette", "Load a block palette JSON first.")
+            return
+        if not state["image"]:
+            messagebox.showwarning("No image", "Load an image first.")
+            return
+        try:
+            tw, th = int(width_var.get()), int(height_var.get())
+            if tw < 1 or th < 1:
+                raise ValueError
+        except ValueError:
+            messagebox.showwarning("Invalid size", "Width and height must be positive integers.")
+            return
+        pixel_grid = build_pixel_grid(state["image"], tw, th)
+        block_grid = match_palette(pixel_grid, state["palette"])
+        set_palette_preview(block_grid, state["palette"])
+
+    preview_container, refresh_preview_widget, set_palette_preview = create_preview_widget(
+        frame, on_rotate=_do_rotate, on_load_palette_preview=_load_palette_preview)
     preview_container.grid(row=1, column=1, rowspan=4, sticky="n", padx=(10, 10), pady=4)
 
     def _refresh_preview():

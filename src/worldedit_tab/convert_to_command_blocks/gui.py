@@ -40,7 +40,7 @@ def create_converter_subframe(parent, gui):
 
     tk.Label(pos_frame, text="Player Position (X Y Z):", bg='#f0f0f0').pack(side="left")
     player_x = tk.StringVar(value="0")
-    player_y = tk.StringVar(value="64")
+    player_y = tk.StringVar(value="-62")
     player_z = tk.StringVar(value="0")
     tk.Entry(pos_frame, textvariable=player_x, width=8).pack(side="left", padx=4)
     tk.Entry(pos_frame, textvariable=player_y, width=8).pack(side="left", padx=4)

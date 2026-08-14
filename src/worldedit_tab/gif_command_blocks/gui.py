@@ -9,7 +9,8 @@ from ..common.image_preview import create_preview_widget
 from ..resource_pack_scanner.scanner import load_palette
 from ..image_to_pixelart.converter import build_pixel_grid, match_palette, locked_dimension
 from ..image_command_blocks.converter import CORNER_NAMES, compute_corners_fixed_size, compute_corners_stretch
-from .converter import load_gif_frames, compute_frame_plan, select_kept_frames, generate_gif_command_block_schem
+from .converter import (load_gif_frames, compute_frame_plan, select_kept_frames,
+                         generate_gif_command_block_schem, decompose_ticks)
 
 LARGE_STRUCTURE_WARNING = 2000  # heads-up threshold for depth-axis extent; not a hard Minecraft limit like world height was
 
@@ -28,11 +29,13 @@ def create_gif_command_blocks_subframe(parent, gui):
 
     tk.Label(frame,
              text="Each frame is a full wall of command blocks (and stone, for pixels that didn't change),\n"
-                  "connected to the next wall by a repeater relay. That relay STRUCTURE advances through\n"
-                  "the world frame by frame, but every frame's commands target the SAME fixed on-screen\n"
-                  "position -- the picture repaints in place, it doesn't march across the world. Repeaters\n"
-                  "always need a quartz block directly beneath them; only every other row needs its own\n"
-                  "relay chain, since a hard-powered row soft-powers its neighbor rows above/below for free.",
+                  "connected to the next wall by a repeater relay -- with one more relay segment before\n"
+                  "frame 0 (power that end to start the animation) and one more after the last frame (a tap\n"
+                  "point for detecting when it's finished). That relay STRUCTURE advances through the world\n"
+                  "frame by frame, but every frame's commands target the SAME fixed on-screen position --\n"
+                  "the picture repaints in place. Repeaters always need a quartz block directly beneath\n"
+                  "them; only every other row needs its own relay chain, since a hard-powered row soft-\n"
+                  "powers its neighbor rows above/below for free.",
              bg='#f0f0f0', fg='#555555', justify="left").grid(row=1, column=0, sticky="w", padx=20, pady=(0, 8))
 
     # --- palette / gif ---
@@ -69,7 +72,23 @@ def create_gif_command_blocks_subframe(parent, gui):
                 pass
         _update_corners_preview()
 
-    preview_container, refresh_preview_widget = create_preview_widget(frame, on_rotate=_do_rotate)
+    def _load_palette_preview():
+        if not state["palette"]:
+            messagebox.showwarning("No palette", "Load a block palette JSON first.")
+            return
+        if not state["frames"]:
+            messagebox.showwarning("No GIF", "Load a GIF first.")
+            return
+        corners = _current_corners()
+        if corners is None:
+            messagebox.showwarning("Invalid coordinates", "Check that all coordinate/size fields are numbers.")
+            return
+        pixel_grid = build_pixel_grid(state["frames"][0], corners["width_blocks"], corners["height_blocks"])
+        block_grid = match_palette(pixel_grid, state["palette"])
+        set_palette_preview(block_grid, state["palette"])
+
+    preview_container, refresh_preview_widget, set_palette_preview = create_preview_widget(
+        frame, on_rotate=_do_rotate, on_load_palette_preview=_load_palette_preview)
     preview_container.grid(row=2, column=1, rowspan=6, sticky="n", padx=(10, 10), pady=4)
     frame.columnconfigure(1, weight=0)
 
@@ -121,7 +140,7 @@ def create_gif_command_blocks_subframe(parent, gui):
     anchor_xyz_row = tk.Frame(fixed_frame, bg='#f0f0f0')
     anchor_xyz_row.pack(fill="x", pady=2)
     tk.Label(anchor_xyz_row, text="Anchor X Y Z:", bg='#f0f0f0').pack(side="left")
-    anchor_x_var, anchor_y_var, anchor_z_var = tk.StringVar(value="0"), tk.StringVar(value="64"), tk.StringVar(value="0")
+    anchor_x_var, anchor_y_var, anchor_z_var = tk.StringVar(value="0"), tk.StringVar(value="-62"), tk.StringVar(value="0")
     tk.Entry(anchor_xyz_row, textvariable=anchor_x_var, width=8).pack(side="left", padx=4)
     tk.Entry(anchor_xyz_row, textvariable=anchor_y_var, width=8).pack(side="left", padx=4)
     tk.Entry(anchor_xyz_row, textvariable=anchor_z_var, width=8).pack(side="left", padx=4)
@@ -131,14 +150,14 @@ def create_gif_command_blocks_subframe(parent, gui):
     a_row = tk.Frame(stretch_frame, bg='#f0f0f0')
     a_row.pack(fill="x", pady=2)
     tk.Label(a_row, text="Corner A  X Y Z:", bg='#f0f0f0').pack(side="left")
-    a_x_var, a_y_var, a_z_var = tk.StringVar(value="0"), tk.StringVar(value="64"), tk.StringVar(value="0")
+    a_x_var, a_y_var, a_z_var = tk.StringVar(value="0"), tk.StringVar(value="-62"), tk.StringVar(value="0")
     tk.Entry(a_row, textvariable=a_x_var, width=8).pack(side="left", padx=4)
     tk.Entry(a_row, textvariable=a_y_var, width=8).pack(side="left", padx=4)
     tk.Entry(a_row, textvariable=a_z_var, width=8).pack(side="left", padx=4)
     b_row = tk.Frame(stretch_frame, bg='#f0f0f0')
     b_row.pack(fill="x", pady=2)
     tk.Label(b_row, text="Corner B (diagonal) X Y Z:", bg='#f0f0f0').pack(side="left")
-    b_x_var, b_y_var, b_z_var = tk.StringVar(value="15"), tk.StringVar(value="79"), tk.StringVar(value="0")
+    b_x_var, b_y_var, b_z_var = tk.StringVar(value="15"), tk.StringVar(value="-47"), tk.StringVar(value="0")
     tk.Entry(b_row, textvariable=b_x_var, width=8).pack(side="left", padx=4)
     tk.Entry(b_row, textvariable=b_y_var, width=8).pack(side="left", padx=4)
     tk.Entry(b_row, textvariable=b_z_var, width=8).pack(side="left", padx=4)
@@ -220,8 +239,28 @@ def create_gif_command_blocks_subframe(parent, gui):
                           "original timing regardless of tick rate) -- change it for custom speed.",
              bg='#f0f0f0', fg='#777777', justify="left").grid(row=9, column=0, sticky="w", padx=20)
 
+    layer_frame = tk.Frame(frame, bg='#f0f0f0')
+    layer_frame.grid(row=10, column=0, sticky="ew", padx=20, pady=2)
+    tk.Label(layer_frame, text="Max blocks per layer (blank = unlimited):", bg='#f0f0f0').pack(side="left")
+    max_depth_var = tk.StringVar(value="")
+    tk.Entry(layer_frame, textvariable=max_depth_var, width=8).pack(side="left", padx=(4, 12))
+    tk.Label(layer_frame, text="Splits a too-long animation into layers, stacked 2 blocks\n"
+                                "apart -- e.g. 512 for a 32-chunk render distance.",
+              bg='#f0f0f0', fg='#777777', justify="left").pack(side="left")
+
+    standing_frame = tk.Frame(frame, bg='#f0f0f0')
+    standing_frame.grid(row=11, column=0, sticky="ew", padx=20, pady=2)
+    tk.Label(standing_frame, text="Standing position when you //paste (X Y Z):", bg='#f0f0f0').pack(side="left")
+    stand_x_var, stand_y_var, stand_z_var = tk.StringVar(value=""), tk.StringVar(value=""), tk.StringVar(value="")
+    tk.Entry(standing_frame, textvariable=stand_x_var, width=6).pack(side="left", padx=(4, 2))
+    tk.Entry(standing_frame, textvariable=stand_y_var, width=6).pack(side="left", padx=2)
+    tk.Entry(standing_frame, textvariable=stand_z_var, width=6).pack(side="left", padx=(2, 12))
+    tk.Label(standing_frame, text="Only needed with a layer limit above -- the fill command that\n"
+                                   "starts each next layer is baked in as absolute coordinates.",
+              bg='#f0f0f0', fg='#777777', justify="left").pack(side="left")
+
     frame_plan_frame = tk.Frame(frame, bg='#eef1f5', bd=1, relief="solid")
-    frame_plan_frame.grid(row=10, column=0, sticky="ew", padx=20, pady=(6, 6))
+    frame_plan_frame.grid(row=12, column=0, sticky="ew", padx=20, pady=(6, 6))
     frame_plan_var = tk.StringVar(value="Load a GIF to see its frame rate and timing plan.")
     tk.Label(frame_plan_frame, textvariable=frame_plan_var, bg='#eef1f5', justify="left",
              font=("Consolas", 10), anchor="w").pack(fill="x", padx=10, pady=8)
@@ -243,23 +282,59 @@ def create_gif_command_blocks_subframe(parent, gui):
         total_frames = len(state["frames"])
         kept = len(range(0, total_frames, plan["keep_every_n"]))
         total_steps = kept * max(1, loop_count)
-        est_depth = (total_steps - 1) * plan["segment_length"] + 1
+        est_depth = 2 * plan["num_repeaters_per_gap"] + (total_steps - 1) * plan["segment_length"] + 1
         warn = ""
         if est_depth > LARGE_STRUCTURE_WARNING:
             warn = (f"\n\u26a0 ~{est_depth} blocks along the depth axis -- generation and pasting a "
                      f"structure this large may be slow.")
+        layer_note = ""
+        max_depth_text = max_depth_var.get().strip()
+        if max_depth_text:
+            try:
+                max_depth = int(max_depth_text)
+                valid_int = max_depth > 0
+            except ValueError:
+                max_depth = None
+                valid_int = False
+            if not valid_int:
+                layer_note = "\n\u26a0 'Max blocks per layer' must be a positive integer, or blank."
+            else:
+                num_repeaters = plan["num_repeaters_per_gap"]
+                segment_length = plan["segment_length"]
+                lead_trail = num_repeaters
+
+                def depth_needed(n):
+                    return lead_trail + (n - 1) * segment_length + 1 + lead_trail
+
+                min_needed = depth_needed(1)
+                if max_depth < min_needed:
+                    layer_note = f"\n\u26a0 Max blocks per layer ({max_depth}) is too small (needs at least {min_needed})."
+                else:
+                    num_layers_est = 0
+                    start = 0
+                    while start < total_steps:
+                        n = 1
+                        while start + n < total_steps and depth_needed(n + 1) <= max_depth:
+                            n += 1
+                        start += n
+                        num_layers_est += 1
+                    if num_layers_est > 1:
+                        layer_note = (f"\n{num_layers_est} layer(s) needed at {max_depth} blocks/layer, stacked "
+                                      f"vertically -- set your standing position below.")
+                    else:
+                        layer_note = f"\nFits in a single layer at {max_depth} blocks/layer -- no splitting needed."
         frame_plan_var.set(
             f"Source: {total_frames} frames at {plan['native_fps']:.2f} fps.   "
             f"Circuit: {plan['ticks_per_gap']} redstone ticks/gap "
             f"({plan['num_repeaters_per_gap']} repeater(s)) -> {plan['achieved_fps']:.2f} fps.\n"
             f"Keeping every {plan['keep_every_n']} frame(s) -> {kept} frame(s) x {max(1, loop_count)} "
-            f"loop(s) = {total_steps} step(s), ~{est_depth} blocks along the depth axis.{warn}"
+            f"loop(s) = {total_steps} step(s), ~{est_depth} blocks along the depth axis.{warn}{layer_note}"
         )
 
     for v in (w_var, h_var, anchor_x_var, anchor_y_var, anchor_z_var, a_x_var, a_y_var, a_z_var,
               b_x_var, b_y_var, b_z_var, stretch_lock_var, stretch_base_var, anchor_corner_var, facing_var):
         v.trace_add("write", _update_corners_preview)
-    for v in (tick_rate_var, target_fps_var, loop_count_var, show_all_var):
+    for v in (tick_rate_var, target_fps_var, loop_count_var, show_all_var, max_depth_var):
         v.trace_add("write", _update_frame_plan)
 
     def _on_w(*_):
@@ -296,10 +371,10 @@ def create_gif_command_blocks_subframe(parent, gui):
     # --- status / output ---
     status_var = tk.StringVar(value="Load a palette and a GIF to begin.")
     tk.Label(frame, textvariable=status_var, bg='#f0f0f0', fg='#333333').grid(
-        row=11, column=0, sticky="w", padx=20, pady=(4, 0))
+        row=13, column=0, sticky="w", padx=20, pady=(4, 0))
     text_out = tk.Text(frame, height=8, font=("Consolas", 10), wrap="word", bg="#fdfdfd")
-    text_out.grid(row=12, column=0, sticky="nsew", padx=20, pady=8)
-    frame.rowconfigure(12, weight=1)
+    text_out.grid(row=14, column=0, sticky="nsew", padx=20, pady=8)
+    frame.rowconfigure(14, weight=1)
 
     def do_generate():
         if not state["palette"]:
@@ -320,6 +395,28 @@ def create_gif_command_blocks_subframe(parent, gui):
             messagebox.showwarning("Invalid timing", "Tick rate, target fps, and loop count must be numbers.")
             return
 
+        max_depth = None
+        max_depth_text = max_depth_var.get().strip()
+        if max_depth_text:
+            try:
+                max_depth = int(max_depth_text)
+                if max_depth <= 0:
+                    raise ValueError
+            except ValueError:
+                messagebox.showwarning("Invalid value", "'Max blocks per layer' must be a positive integer, or blank.")
+                return
+
+        standing_pos = None
+        if max_depth is not None:
+            try:
+                standing_pos = (int(stand_x_var.get()), int(stand_y_var.get()), int(stand_z_var.get()))
+            except ValueError:
+                messagebox.showwarning(
+                    "Standing position needed",
+                    "With 'Max blocks per layer' set, enter the X Y Z you'll be standing at when you "
+                    "run //paste -- the fill command connecting each layer needs it baked in.")
+                return
+
         try:
             plan = compute_frame_plan(state["native_fps"], tick_rate, target_fps, show_all_var.get())
         except ValueError as e:
@@ -335,8 +432,14 @@ def create_gif_command_blocks_subframe(parent, gui):
             frame_block_grids.append(match_palette(pixel_grid, state["palette"]))
 
         facing = facing_var.get()
-        new_root = generate_gif_command_block_schem(frame_block_grids, facing, corners,
-                                                      ticks_per_gap=plan["ticks_per_gap"], loop_count=loop_count)
+
+        try:
+            new_root = generate_gif_command_block_schem(frame_block_grids, facing, corners,
+                                                          ticks_per_gap=plan["ticks_per_gap"], loop_count=loop_count,
+                                                          max_depth_per_layer=max_depth, standing_pos=standing_pos)
+        except ValueError as e:
+            messagebox.showwarning("Can't generate", str(e))
+            return
 
         out_path = filedialog.asksaveasfilename(
             defaultextension=".schem", filetypes=[("Schematic", "*.schem")],
@@ -354,14 +457,18 @@ def create_gif_command_blocks_subframe(parent, gui):
                                     f"Frames kept: {len(kept_frames)} of {len(state['frames'])}, x{loop_count} loop(s)\n"
                                     f"Achieved playback: {plan['achieved_fps']:.2f} fps "
                                     f"({plan['ticks_per_gap']} redstone ticks, {plan['num_repeaters_per_gap']} repeater(s)/gap)\n"
-                                    f"Bottom-Left: {corners['bottom_left']}   Top-Right: {corners['top_right']}\n")
+                                    f"Bottom-Left: {corners['bottom_left']}   Top-Right: {corners['top_right']}\n"
+                                    + (f"Split across layers stacked {target_h + 3} blocks apart. Paste standing "
+                                       f"exactly at {standing_pos}, no rotation -- power the lead-in relay at the "
+                                       f"bottom layer to start; the rest triggers automatically.\n"
+                                       if max_depth else ""))
             if gui is not None and hasattr(gui, "print_to_text"):
                 gui.print_to_text(f"Animated command block schematic saved to {out_path}", "normal")
         except Exception as e:
             messagebox.showerror("Save failed", str(e))
 
     btn_frame = tk.Frame(frame, bg='#f0f0f0')
-    btn_frame.grid(row=13, column=0, sticky="ew", padx=20, pady=(0, 10))
+    btn_frame.grid(row=15, column=0, sticky="ew", padx=20, pady=(0, 10))
     tk.Button(btn_frame, text="Generate Animated Command Block Schematic", command=do_generate,
               bg='#4CAF50', fg='white', width=38).pack(side="left")
 

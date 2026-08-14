@@ -109,20 +109,10 @@
     74,
     42
   ],
-  "minecraft:budding_amethyst": [
-    122,
-    91,
-    181
-  ],
   "minecraft:calcite": [
     217,
     219,
     215
-  ],
-  "minecraft:cherry_leaves": [
-    252,
-    203,
-    231
   ],
   "minecraft:cherry_log": [
     48,
@@ -169,11 +159,6 @@
     123,
     124
   ],
-  "minecraft:chorus_flower": [
-    91,
-    52,
-    91
-  ],
   "minecraft:clay": [
     164,
     169,
@@ -183,11 +168,6 @@
     8,
     8,
     8
-  ],
-  "minecraft:coal_ore": [
-    121,
-    121,
-    121
   ],
   "minecraft:coarse_dirt": [
     119,
@@ -203,16 +183,6 @@
     102,
     102,
     102
-  ],
-  "minecraft:copper_block": [
-    200,
-    116,
-    86
-  ],
-  "minecraft:copper_ore": [
-    122,
-    122,
-    122
   ],
   "minecraft:cracked_deepslate_bricks": [
     40,
@@ -239,11 +209,6 @@
     123,
     124
   ],
-  "minecraft:crimson_nylium": [
-    123,
-    0,
-    0
-  ],
   "minecraft:crimson_planks": [
     126,
     58,
@@ -253,11 +218,6 @@
     71,
     35,
     51
-  ],
-  "minecraft:cut_copper": [
-    227,
-    130,
-    108
   ],
   "minecraft:cut_red_sandstone": [
     194,
@@ -334,46 +294,6 @@
     88,
     88
   ],
-  "minecraft:deepslate_coal_ore": [
-    81,
-    81,
-    81
-  ],
-  "minecraft:deepslate_copper_ore": [
-    81,
-    81,
-    81
-  ],
-  "minecraft:deepslate_diamond_ore": [
-    81,
-    81,
-    81
-  ],
-  "minecraft:deepslate_emerald_ore": [
-    100,
-    100,
-    100
-  ],
-  "minecraft:deepslate_gold_ore": [
-    81,
-    81,
-    81
-  ],
-  "minecraft:deepslate_iron_ore": [
-    61,
-    61,
-    67
-  ],
-  "minecraft:deepslate_lapis_ore": [
-    100,
-    100,
-    100
-  ],
-  "minecraft:deepslate_redstone_ore": [
-    81,
-    81,
-    81
-  ],
   "minecraft:deepslate_tiles": [
     41,
     41,
@@ -383,11 +303,6 @@
     101,
     245,
     227
-  ],
-  "minecraft:diamond_ore": [
-    122,
-    122,
-    122
   ],
   "minecraft:dirt": [
     121,
@@ -404,11 +319,6 @@
     197,
     68
   ],
-  "minecraft:emerald_ore": [
-    122,
-    122,
-    122
-  ],
   "minecraft:end_stone": [
     213,
     218,
@@ -419,20 +329,10 @@
     244,
     178
   ],
-  "minecraft:gilded_blackstone": [
-    39,
-    34,
-    28
-  ],
   "minecraft:gold_block": [
     254,
     230,
     75
-  ],
-  "minecraft:gold_ore": [
-    122,
-    122,
-    122
   ],
   "minecraft:granite": [
     154,
@@ -489,16 +389,6 @@
     230,
     230
   ],
-  "minecraft:iron_ore": [
-    122,
-    122,
-    122
-  ],
-  "minecraft:jack_o_lantern": [
-    227,
-    144,
-    29
-  ],
   "minecraft:jungle_log": [
     88,
     71,
@@ -513,11 +403,6 @@
     30,
     66,
     133
-  ],
-  "minecraft:lapis_ore": [
-    123,
-    123,
-    123
   ],
   "minecraft:light_blue_concrete": [
     35,
@@ -849,11 +734,6 @@
     210,
     163
   ],
-  "minecraft:sculk": [
-    13,
-    18,
-    23
-  ],
   "minecraft:sea_lantern": [
     217,
     230,
@@ -878,11 +758,6 @@
     58,
     44,
     36
-  ],
-  "minecraft:sponge": [
-    205,
-    206,
-    74
   ],
   "minecraft:spruce_log": [
     59,
@@ -969,11 +844,6 @@
     110,
     111
   ],
-  "minecraft:warped_nylium": [
-    22,
-    97,
-    91
-  ],
   "minecraft:warped_planks": [
     57,
     135,
@@ -983,11 +853,6 @@
     22,
     126,
     134
-  ],
-  "minecraft:wet_sponge": [
-    176,
-    191,
-    76
   ],
   "minecraft:white_concrete": [
     206,
